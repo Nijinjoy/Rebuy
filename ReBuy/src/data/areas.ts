@@ -22,6 +22,35 @@ export const AREAS: Area[] = [
 
 export const DEFAULT_AREA = AREAS[0];
 
+// The seven emirates, largest first, with the AREAS inside each. A listing
+// whose location is the emirate's own name (e.g. "Ajman") counts too.
+export const EMIRATES: { name: string; areas: string[] }[] = [
+  {
+    name: 'Dubai',
+    areas: [
+      'Dubai Marina',
+      'JLT',
+      'Al Barsha',
+      'Arabian Ranches',
+      'Jumeirah',
+      'Business Bay',
+      'Deira',
+      'Mirdif',
+    ],
+  },
+  { name: 'Abu Dhabi', areas: ['Abu Dhabi'] },
+  { name: 'Sharjah', areas: ['Sharjah'] },
+  { name: 'Ajman', areas: [] },
+  { name: 'Ras Al Khaimah', areas: [] },
+  { name: 'Fujairah', areas: [] },
+  { name: 'Umm Al Quwain', areas: [] },
+];
+
+// Listing locations that belong to an emirate, for the Explore filter.
+export function emirateLocations(emirate: { name: string; areas: string[] }) {
+  return [...new Set([emirate.name, ...emirate.areas])];
+}
+
 export function findArea(name: string) {
   return AREAS.find(a => a.name === name);
 }

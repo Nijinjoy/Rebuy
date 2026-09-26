@@ -20,12 +20,13 @@ function App() {
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              {showSplash ? (
+              {/* The app renders underneath the splash from the start, so
+                  the splash fades out onto a ready screen, not a blank one. */}
+              <AppProviders>
+                <RootNavigator />
+              </AppProviders>
+              {showSplash && (
                 <SplashScreen onFinish={() => setShowSplash(false)} />
-              ) : (
-                <AppProviders>
-                  <RootNavigator />
-                </AppProviders>
               )}
             </AuthProvider>
           </QueryClientProvider>

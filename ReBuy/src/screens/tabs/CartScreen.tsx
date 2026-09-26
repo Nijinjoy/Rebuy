@@ -102,7 +102,7 @@ function CartScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <ScreenHeader title="Cart" />
+        <ScreenHeader title="Cart" pill />
       </View>
       {items.length === 0 ? (
         <View style={styles.empty}>
@@ -111,7 +111,7 @@ function CartScreen({ navigation }: Props) {
           <Text style={styles.emptyText}>Items you add will appear here.</Text>
           <Button
             title="Browse items"
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.navigate('Explore')}
             style={styles.emptyButton}
           />
         </View>

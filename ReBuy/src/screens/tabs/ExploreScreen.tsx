@@ -11,8 +11,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BrowseSections from '../../components/explore/BrowseSections';
 import Chip from '../../components/explore/Chip';
 import FilterSheet from '../../components/explore/FilterSheet';
+import PopularSearches from '../../components/explore/PopularSearches';
+import SectionTitle from '../../components/explore/SectionTitle';
 import SortSheet from '../../components/explore/SortSheet';
 import ProductCard from '../../components/product/ProductCard';
 import ErrorState from '../../components/ui/ErrorState';
@@ -34,8 +37,11 @@ import { colors, fonts } from '../../theme';
 
 const PADDING = 24;
 const GAP = 12;
+// Categories shown before "View all": one row.
+const CATEGORY_PREVIEW = 3;
 
-// Cover photo of the newest listing and listing count for each category.
+// Cover photo of the newest listing and listing count for each category,
+// busiest first (ties keep CATEGORIES' order).
 function categoryTiles(listings: Product[]) {
   return CATEGORIES.map(category => {
     const inCategory = listings.filter(p => p.category === category);
@@ -44,20 +50,18 @@ function categoryTiles(listings: Product[]) {
       image: inCategory[0]?.images[0],
       count: inCategory.length,
     };
-  });
+  }).sort((a, b) => b.count - a.count);
 }
 
 function CategoryTile({
   category,
   image,
   count,
-  width,
   onPress,
 }: {
   category: Category;
   image?: string;
   count: number;
-  width: number;
   onPress: () => void;
 }) {
   return (
@@ -67,11 +71,7 @@ function CategoryTile({
         count === 1 ? 'item' : 'items'
       }`}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.categoryTile,
-        { width },
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.categoryTile, pressed && styles.pressed]}
     >
       <View style={styles.categoryImage}>
         {image ? (
@@ -114,10 +114,11 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
   }, [params]);
 
   const cardWidth = (width - PADDING * 2 - GAP) / 2;
-  const tileWidth = (width - PADDING * 2 - GAP * 2) / 3;
 
   const { data: listings, error, refetch, isRefetching } = useListings();
   const tiles = useMemo(() => categoryTiles(listings ?? []), [listings]);
+  const [allCategories, setAllCategories] = useState(false);
+  const shownTiles = allCategories ? tiles : tiles.slice(0, CATEGORY_PREVIEW);
   const results = useMemo(
     () => searchListings(listings ?? [], { query, category, filters, sort }),
     [listings, query, category, filters, sort],
@@ -127,8 +128,9 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
       .length;
 
   const filterCount = countFilters(filters);
-  // With no search or category, show the category grid above all listings.
-  const browsing = !query.trim() && !category;
+  // With no search, category or filters, show just the category grid;
+  // listings appear once the user searches, filters or picks a category.
+  const browsing = !query.trim() && !category && filterCount === 0;
 
   const toolbar = (
     <View style={styles.toolbar}>
@@ -168,6 +170,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         <ScreenHeader
           title={category ?? 'Explore'}
           onBack={category ? () => setCategory(null) : undefined}
+          pill
         />
         <View style={styles.searchRow}>
           <View style={styles.search}>
@@ -211,6 +214,14 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         </View>
       </View>
 
+      {browsing && (
+        <PopularSearches
+          listings={listings ?? []}
+          inset={PADDING}
+          onSearch={setQuery}
+        />
+      )}
+
       {!browsing && (
         <View>
           <ScrollView
@@ -237,7 +248,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
       )}
 
       <FlatList
-        data={results}
+        data={browsing ? [] : results}
         keyExtractor={p => p.id}
         numColumns={2}
         renderItem={({ item }) => (
@@ -257,26 +268,37 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         ListHeaderComponent={
           browsing ? (
             <View style={styles.browse}>
-              <Text style={styles.sectionTitle} accessibilityRole="header">
-                Categories
-              </Text>
-              <View style={styles.categoryGrid}>
-                {tiles.map(tile => (
-                  <CategoryTile
-                    key={tile.category}
-                    {...tile}
-                    width={tileWidth}
-                    onPress={() => setCategory(tile.category)}
-                  />
-                ))}
+              <View>
+                <SectionTitle
+                  title="Categories"
+                  action={
+                    tiles.length > CATEGORY_PREVIEW
+                      ? {
+                          label: allCategories ? 'Show less' : 'View all',
+                          onPress: () => setAllCategories(open => !open),
+                        }
+                      : undefined
+                  }
+                />
+                <View style={styles.categoryGrid}>
+                  {shownTiles.map(tile => (
+                    <CategoryTile
+                      key={tile.category}
+                      {...tile}
+                      onPress={() =>
+                        navigation.navigate('Category', {
+                          category: tile.category,
+                        })
+                      }
+                    />
+                  ))}
+                </View>
               </View>
-              <Text
-                style={[styles.sectionTitle, styles.allListings]}
-                accessibilityRole="header"
-              >
-                All listings
-              </Text>
-              {toolbar}
+              <BrowseSections
+                listings={listings ?? []}
+                inset={PADDING}
+                onFilter={setFilters}
+              />
             </View>
           ) : (
             toolbar
@@ -291,15 +313,13 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
             ) : (
               <LoadingState />
             )
-          ) : (
+          ) : browsing ? undefined : (
             <View style={styles.empty}>
               <Icon name="explore" color={colors.placeholder} size={48} />
               <Text style={styles.emptyTitle}>No items found</Text>
               <Text style={styles.emptyText}>
                 {filterCount > 0
                   ? 'Try removing some filters.'
-                  : browsing
-                  ? 'New listings will appear here.'
                   : 'Try a different search or category.'}
               </Text>
             </View>
@@ -402,8 +422,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: GAP,
   },
+  // Popular searches above already leaves a gap below it.
   listBrowsing: {
-    paddingTop: 20,
+    paddingTop: 6,
   },
   row: {
     gap: GAP,
@@ -411,20 +432,16 @@ const styles = StyleSheet.create({
   browse: {
     gap: 12,
   },
-  sectionTitle: {
-    fontFamily: fonts.display,
-    fontSize: 18,
-    color: colors.textPrimary,
-  },
-  allListings: {
-    marginTop: 12,
-  },
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GAP,
   },
+  // Three per row, stretched to fill it. Sizing with flex rather than a
+  // computed width avoids rounding pushing the third tile onto a new row.
   categoryTile: {
+    flexGrow: 1,
+    flexBasis: '30%',
     alignItems: 'center',
     gap: 2,
     paddingVertical: 12,

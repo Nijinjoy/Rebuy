@@ -114,7 +114,7 @@ function ChatsScreen({ navigation }: TabScreenProps<'Chats'>) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <ScreenHeader title="Chats" />
+        <ScreenHeader title="Chats" pill />
         <View style={styles.search}>
           <Icon name="explore" color={colors.placeholder} size={18} />
           <TextInput

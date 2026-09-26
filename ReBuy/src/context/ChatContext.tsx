@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useSessionState } from './useSessionState';
 import { Chat, MessageImage } from '../types/chat';
 import { SAMPLE_CHATS } from '../data/sampleChats';
 import type { Product } from '../types/listing';
@@ -25,7 +26,7 @@ function currentTime() {
 
 // Holds conversations in memory until the chat API exists.
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [chats, setChats] = useState<Chat[]>(SAMPLE_CHATS);
+  const [chats, setChats] = useSessionState<Chat[]>(SAMPLE_CHATS);
 
   const value = useMemo<ChatContextValue>(
     () => ({
@@ -92,7 +93,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         });
       },
     }),
-    [chats],
+    [chats, setChats],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

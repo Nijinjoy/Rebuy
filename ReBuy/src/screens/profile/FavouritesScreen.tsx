@@ -67,7 +67,7 @@ function FavouritesScreen({ navigation }: RootStackScreenProps<'Favourites'>) {
                 onPress={() =>
                   navigation.navigate('App', {
                     screen: 'Tabs',
-                    params: { screen: 'Home' },
+                    params: { screen: 'Explore' },
                   })
                 }
                 style={styles.emptyButton}

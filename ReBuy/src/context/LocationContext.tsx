@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useSessionState } from './useSessionState';
 import { Area, DEFAULT_AREA } from '../data/areas';
 
 type LocationContextValue = {
@@ -11,11 +12,11 @@ const LocationContext = createContext<LocationContextValue | null>(null);
 
 // Picked by hand from AREAS until the app uses GPS.
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const [area, setArea] = useState<Area>(DEFAULT_AREA);
+  const [area, setArea] = useSessionState<Area>(DEFAULT_AREA);
 
   const value = useMemo<LocationContextValue>(
     () => ({ area, setArea }),
-    [area],
+    [area, setArea],
   );
 
   return (

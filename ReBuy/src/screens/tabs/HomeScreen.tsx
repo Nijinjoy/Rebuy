@@ -1,12 +1,11 @@
 import { DrawerActions } from '@react-navigation/native';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Image,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,77 +13,44 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../../context/AuthContext';
-import LocationSheet from '../../components/home/LocationSheet';
+import PromoCarousel from '../../components/home/PromoCarousel';
+import ProductCard from '../../components/product/ProductCard';
+import ProductThumb from '../../components/product/ProductThumb';
+import EmptyState from '../../components/ui/EmptyState';
 import ErrorState from '../../components/ui/ErrorState';
-import Icon, { IconName } from '../../components/ui/Icon';
+import Icon from '../../components/ui/Icon';
 import LoadingState from '../../components/ui/LoadingState';
-import { Area, distanceKm, findArea } from '../../data/areas';
-import { useLocation } from '../../context/LocationContext';
-import { CATEGORIES, Product } from '../../types/listing';
+import SearchField from '../../components/ui/SearchField';
 import { useFavorites } from '../../context/FavoritesContext';
+import { useLocation } from '../../context/LocationContext';
+import { Area, distanceKm, findArea } from '../../data/areas';
 import { useListings } from '../../hooks/useListings';
 import type { TabScreenProps } from '../../navigation/types';
-import { colors, fonts, palette, withAlpha } from '../../theme';
+import { CATEGORIES, Product } from '../../types/listing';
+import { colors, fonts, palette } from '../../theme';
+import { getCurrentArea, LocationError } from '../../utils/currentLocation';
 import { formatPrice } from '../../utils/format';
+import { NO_FILTERS, searchListings } from '../../utils/listingSearch';
 
-const PADDING = 20;
+const PADDING = 24;
 const GAP = 12;
 const DEAL_LIMIT = 500;
+const NEARBY_KM = 25;
+// Nearby and deals show as two rows of three.
+const GRID_COLUMNS = 3;
+const GRID_COUNT = GRID_COLUMNS * 2;
+const PRELOAD_TABS = ['Explore', 'Cart', 'Chats', 'Sell'] as const;
 
-type Promo = {
-  id: string;
-  eyebrow: string;
-  title: string;
-  cta: string;
-  icon: IconName;
-  gradient: string;
-  dark: boolean;
-  target: 'Sell' | 'Explore' | 'Chats';
-};
-
-const PROMOS: Promo[] = [
-  {
-    id: 'sell',
-    eyebrow: 'DECLUTTER & EARN',
-    title: 'Sell your item\nin 60 seconds',
-    cta: 'Start selling',
-    icon: 'sell',
-    gradient: `linear-gradient(135deg, ${palette.ink} 0%, #3B4F55 100%)`,
-    dark: true,
-    target: 'Sell',
-  },
-  {
-    id: 'deals',
-    eyebrow: 'HOT DEALS',
-    title: `Great finds under\nAED ${DEAL_LIMIT}`,
-    cta: 'Shop deals',
-    icon: 'explore',
-    gradient: `linear-gradient(135deg, ${palette.gold} 0%, #E6C98A 100%)`,
-    dark: false,
-    target: 'Explore',
-  },
-  {
-    id: 'chat',
-    eyebrow: 'MAKE AN OFFER',
-    title: 'Chat with sellers\nand get a better price',
-    cta: 'Open chats',
-    icon: 'chats',
-    gradient: `linear-gradient(135deg, ${palette.sand} 0%, ${palette.ivory} 100%)`,
-    dark: false,
-    target: 'Chats',
-  },
-];
-
+// Listings priced up to DEAL_LIMIT, cheapest first.
 function deals(listings: Product[]) {
   return listings
     .filter(p => p.price <= DEAL_LIMIT)
-    .sort((a, b) => a.price - b.price);
+    .sort((a, b) => a.price - b.price)
+    .slice(0, GRID_COUNT);
 }
 
-const NEARBY_KM = 25;
-
-// Listings within NEARBY_KM of `area`, closest first, with their distance.
+// The GRID_COUNT listings closest to `area`, within NEARBY_KM, with their
+// distance.
 function nearby(listings: Product[], area: Area) {
   return listings
     .flatMap(product => {
@@ -95,7 +61,8 @@ function nearby(listings: Product[], area: Area) {
       const km = distanceKm(area, listingArea);
       return km <= NEARBY_KM ? [{ product, km }] : [];
     })
-    .sort((a, b) => a.km - b.km);
+    .sort((a, b) => a.km - b.km)
+    .slice(0, GRID_COUNT);
 }
 
 function formatKm(km: number) {
@@ -120,66 +87,52 @@ function recommend(listings: Product[], savedIds: string[]) {
     .slice(0, 8);
 }
 
-// Cover photo of the newest listing in each category, if any.
+// Compact listing card: photo with a price tag, the title, and a caption.
+function RailCard({
+  product,
+  caption,
+  width = 140,
+  onPress,
+}: {
+  product: Product;
+  caption: string;
+  width?: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${product.title}, ${formatPrice(product.price)}`}
+      onPress={onPress}
+      style={({ pressed }) => [{ width }, pressed && styles.pressed]}
+    >
+      <View>
+        <ProductThumb
+          title={product.title}
+          uri={product.images[0]}
+          size={width}
+          radius={18}
+        />
+        <View style={styles.priceTag}>
+          <Text style={styles.priceTagText}>{formatPrice(product.price)}</Text>
+        </View>
+      </View>
+      <Text style={styles.railTitle} numberOfLines={2}>
+        {product.title}
+      </Text>
+      <Text style={styles.railCaption} numberOfLines={1}>
+        {caption}
+      </Text>
+    </Pressable>
+  );
+}
+
+// Cover photo for each category: its newest listing's first image.
 function categoryTiles(listings: Product[]) {
   return CATEGORIES.map(category => ({
     category,
     image: listings.find(p => p.category === category)?.images[0],
   }));
-}
-
-// `flush` drops the border and corners for photos inside a bordered card.
-function Photo({
-  uri,
-  size,
-  flush = false,
-}: {
-  uri?: string;
-  size: number;
-  flush?: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.photo,
-        flush && styles.photoFlush,
-        { width: size, height: size },
-      ]}
-    >
-      {!!uri && (
-        <Image
-          source={{ uri }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="contain"
-        />
-      )}
-    </View>
-  );
-}
-
-function HeartButton({ product }: { product: Product }) {
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const saved = isFavorite(product.id);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        saved ? `Unsave ${product.title}` : `Save ${product.title}`
-      }
-      accessibilityState={{ selected: saved }}
-      hitSlop={8}
-      onPress={() => toggleFavorite(product.id)}
-      style={({ pressed }) => [styles.heart, pressed && styles.pressed]}
-    >
-      <Icon
-        name="heart"
-        size={16}
-        color={saved ? palette.red : colors.textPrimary}
-        fill={saved ? palette.red : 'none'}
-      />
-    </Pressable>
-  );
 }
 
 function SectionHeader({
@@ -207,307 +160,154 @@ function SectionHeader({
   );
 }
 
-function PromoCarousel({
-  width,
-  onPress,
-}: {
-  width: number;
-  onPress: (promo: Promo) => void;
-}) {
-  const [index, setIndex] = useState(0);
-  const cardWidth = width - PADDING * 2;
-  const step = cardWidth + GAP;
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const page = Math.round(e.nativeEvent.contentOffset.x / step);
-    if (page !== index) {
-      setIndex(page);
-    }
-  };
-
-  return (
-    <View>
-      <FlatList
-        horizontal
-        data={PROMOS}
-        keyExtractor={p => p.id}
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={step}
-        decelerationRate="fast"
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.promos}
-        renderItem={({ item }) => {
-          const fg = item.dark ? colors.onPrimary : colors.textPrimary;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${item.title.replace('\n', ' ')}. ${
-                item.cta
-              }`}
-              onPress={() => onPress(item)}
-              style={({ pressed }) => [
-                styles.promo,
-                { width: cardWidth, backgroundImage: item.gradient },
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.promoText}>
-                <Text
-                  style={[
-                    styles.promoEyebrow,
-                    { color: item.dark ? colors.accent : colors.textPrimary },
-                  ]}
-                >
-                  {item.eyebrow}
-                </Text>
-                <Text style={[styles.promoTitle, { color: fg }]}>
-                  {item.title}
-                </Text>
-                <View
-                  style={[
-                    styles.promoCta,
-                    {
-                      backgroundColor: item.dark
-                        ? colors.accent
-                        : colors.primary,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.promoCtaText,
-                      {
-                        color: item.dark ? colors.primary : colors.onPrimary,
-                      },
-                    ]}
-                  >
-                    {item.cta} →
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.promoIcon,
-                  {
-                    backgroundColor: withAlpha(
-                      item.dark ? palette.gold : palette.ink,
-                      item.dark ? 0.2 : 0.08,
-                    ),
-                  },
-                ]}
-              >
-                <Icon
-                  name={item.icon}
-                  color={item.dark ? colors.accent : colors.textPrimary}
-                  size={40}
-                />
-              </View>
-            </Pressable>
-          );
-        }}
-      />
-      <View style={styles.dots} accessibilityElementsHidden>
-        {PROMOS.map((p, i) => (
-          <View key={p.id} style={[styles.dot, i === index && styles.dotOn]} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// Compact card for the horizontal rails, with an optional line under the
-// title.
-function RailCard({
-  product,
-  caption,
-  onPress,
-}: {
-  product: Product;
-  caption?: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${product.title}, ${formatPrice(product.price)}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.deal, pressed && styles.pressed]}
-    >
-      <View>
-        <Photo uri={product.images[0]} size={138} />
-        <View style={styles.priceTag}>
-          <Text style={styles.priceTagText}>{formatPrice(product.price)}</Text>
-        </View>
-      </View>
-      <Text style={styles.dealTitle} numberOfLines={2}>
-        {product.title}
-      </Text>
-      {!!caption && (
-        <Text style={styles.dealCaption} numberOfLines={1}>
-          {caption}
-        </Text>
-      )}
-    </Pressable>
-  );
-}
-
-function ListingTile({
-  product,
-  width,
-  onPress,
-}: {
-  product: Product;
-  width: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${product.title}, ${formatPrice(
-        product.price,
-      )}, posted ${product.postedAt}`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        { width },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View>
-        <Photo uri={product.images[0]} size={width - 2} flush />
-        <View style={styles.newBadge}>
-          <Text style={styles.newBadgeText}>{product.postedAt}</Text>
-        </View>
-        <HeartButton product={product} />
-      </View>
-      <View style={styles.tileBody}>
-        <Text style={styles.tilePrice}>{formatPrice(product.price)}</Text>
-        <Text style={styles.tileTitle} numberOfLines={1}>
-          {product.title}
-        </Text>
-        <Text style={styles.tileMeta} numberOfLines={1}>
-          <Text style={styles.star}>★ </Text>
-          {product.sellerRating.toFixed(1)} · {product.location}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
+// Landing tab: the user's current location, a search field that lists
+// matching items as they type, and promo banners while not searching.
 function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
-  const { user } = useAuth();
+  const { area, setArea } = useLocation();
+  // Whether `area` came from GPS this session, rather than the default.
+  const [located, setLocated] = useState(false);
+  const [locating, setLocating] = useState(false);
+
   const { width } = useWindowDimensions();
+  const cardWidth = (width - PADDING * 2 - GAP) / 2;
+  const { data: listings, error, refetch } = useListings();
+  const [query, setQuery] = useState('');
+  const searching = query.trim().length > 0;
   const { ids: savedIds } = useFavorites();
-  const { data, error, refetch, isRefetching } = useListings();
-  const listings = useMemo(() => data ?? [], [data]);
   const recommended = useMemo(
-    () => recommend(listings, savedIds),
+    () => recommend(listings ?? [], savedIds),
     [listings, savedIds],
   );
-  const dealListings = useMemo(() => deals(listings), [listings]);
-  const tiles = useMemo(() => categoryTiles(listings), [listings]);
-  const { area, setArea } = useLocation();
-  const [locationOpen, setLocationOpen] = useState(false);
+  // Only once GPS has found the user, so distances aren't from a default.
   const nearbyListings = useMemo(
-    () => nearby(listings, area),
-    [listings, area],
+    () => (located ? nearby(listings ?? [], area) : []),
+    [listings, area, located],
   );
-  const firstName = user?.name.trim().split(/\s+/)[0];
-  const tileWidth = (width - PADDING * 2 - GAP) / 2;
+  // Rounded down so rounding can't push the third card onto a new row.
+  const gridCardWidth = Math.floor(
+    (width - PADDING * 2 - GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+  );
+  const dealListings = useMemo(() => deals(listings ?? []), [listings]);
+  const tiles = useMemo(() => categoryTiles(listings ?? []), [listings]);
+  const results = useMemo(
+    () =>
+      searching
+        ? searchListings(listings ?? [], {
+            query,
+            category: null,
+            filters: NO_FILTERS,
+            sort: 'newest',
+          })
+        : [],
+    [listings, query, searching],
+  );
 
-  const openProduct = (product: Product) =>
-    navigation.navigate('Product', { productId: product.id });
+  // `quiet` skips the error alert, for the automatic lookup on open.
+  const locate = useCallback(
+    async (quiet = false) => {
+      setLocating(true);
+      try {
+        setArea(await getCurrentArea());
+        setLocated(true);
+      } catch (err) {
+        if (!quiet) {
+          Alert.alert(
+            'Location unavailable',
+            err instanceof LocationError
+              ? err.message
+              : 'Something went wrong. Please try again.',
+          );
+        }
+      } finally {
+        setLocating(false);
+      }
+    },
+    [setArea],
+  );
+
+  useEffect(() => {
+    locate(true);
+  }, [locate]);
+
+  // Tabs mount on first visit, which makes that first switch stutter.
+  // Home is the first tab, so it mounts the others in the background once
+  // it has settled, one at a time so no single frame does all the work.
+  useEffect(() => {
+    const timers = PRELOAD_TABS.map((tab, i) =>
+      setTimeout(() => navigation.preload(tab), 800 + i * 250),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [navigation]);
+
+  const label = located
+    ? area.name
+    : locating
+    ? 'Finding your location…'
+    : 'Set your location';
 
   // The tab bar already covers the bottom safe area.
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => {
-              refetch();
-            }}
-            tintColor={colors.accent}
-          />
-        }
-      >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open menu"
-            hitSlop={8}
-            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="menu" color={colors.textPrimary} size={22} />
-          </Pressable>
-          <View style={styles.hello}>
-            <Text style={styles.helloName} numberOfLines={1}>
-              Hi {firstName ?? 'there'} 👋
-            </Text>
-            <Text style={styles.helloSub}>What are you looking for?</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Location: ${area.name}. Change location`}
-            hitSlop={8}
-            onPress={() => setLocationOpen(true)}
-            style={({ pressed }) => [
-              styles.location,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="mapPin" color={colors.accent} size={16} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {area.name}
-            </Text>
-            <Icon name="chevronDown" color={colors.textSecondary} size={14} />
-          </Pressable>
-        </View>
-
+      <View style={styles.header}>
         <Pressable
-          accessibilityRole="search"
-          accessibilityLabel="Search items"
-          onPress={() => navigation.navigate('Explore')}
-          style={({ pressed }) => [styles.search, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+          hitSlop={8}
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          style={({ pressed }) => [
+            styles.iconButton,
+            pressed && styles.pressed,
+          ]}
         >
-          <Icon name="explore" color={colors.textSecondary} size={20} />
-          <Text style={styles.searchText}>Search phones, sofas, shoes…</Text>
+          <Icon name="menu" color={colors.textPrimary} size={22} />
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Location: ${label}. Use my current location`}
+          accessibilityState={{ busy: locating }}
+          hitSlop={8}
+          disabled={locating}
+          onPress={() => locate()}
+          style={({ pressed }) => [styles.location, pressed && styles.pressed]}
+        >
+          <Icon name="mapPin" color={colors.accent} size={16} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {label}
+          </Text>
+          {locating ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Icon name="locate" color={colors.textSecondary} size={14} />
+          )}
+        </Pressable>
+      </View>
 
-        <PromoCarousel
-          width={width}
-          onPress={promo => navigation.navigate(promo.target)}
+      <View style={styles.searchRow}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search phones, sofas, shoes…"
         />
+      </View>
 
-        {!data ? (
+      {!searching && (
+        <ScrollView
+          contentContainerStyle={styles.browse}
+          showsVerticalScrollIndicator={false}
+        >
+          <PromoCarousel
+            width={width}
+            inset={PADDING}
+            onPress={promo => navigation.navigate(promo.target)}
+          />
+
           <View style={styles.padded}>
-            {error ? (
-              <ErrorState error={error} onRetry={() => refetch()} />
-            ) : (
-              <LoadingState />
-            )}
-          </View>
-        ) : (
-          <>
-            <View style={styles.padded}>
-              <SectionHeader
-                title="Shop by category"
-                onSeeAll={() => navigation.navigate('Explore')}
-              />
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categories}
-            >
+            <SectionHeader
+              title="Shop by category"
+              onSeeAll={() => navigation.navigate('Explore')}
+            />
+            {/* Four per row; the six categories make two rows. */}
+            <View style={styles.categories}>
               {tiles.map(({ category, image }) => (
                 <Pressable
                   key={category}
@@ -532,109 +332,132 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                       </Text>
                     )}
                   </View>
-                  <Text style={styles.categoryText}>{category}</Text>
+                  <Text style={styles.categoryText} numberOfLines={1}>
+                    {category}
+                  </Text>
                 </Pressable>
               ))}
-            </ScrollView>
-
-            <View style={styles.padded}>
-              <SectionHeader
-                title="Recommended for you"
-                onSeeAll={() => navigation.navigate('Explore')}
-              />
             </View>
-            <FlatList
-              horizontal
-              data={recommended}
-              keyExtractor={p => p.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.rail}
-              renderItem={({ item }) => (
-                <RailCard
-                  product={item}
-                  caption={`★ ${item.sellerRating.toFixed(1)} · ${formatPrice(
-                    item.price,
-                  )}`}
-                  onPress={() => openProduct(item)}
-                />
-              )}
-            />
+          </View>
 
-            {nearbyListings.length > 0 && (
-              <>
-                <View style={styles.padded}>
-                  <SectionHeader
-                    title="Nearby listings"
-                    onSeeAll={() => navigation.navigate('Explore')}
+          {recommended.length > 0 && (
+            <>
+              <View style={styles.padded}>
+                <SectionHeader
+                  title="Recommended for you"
+                  onSeeAll={() => navigation.navigate('Explore')}
+                />
+              </View>
+              <FlatList
+                horizontal
+                data={recommended}
+                keyExtractor={p => p.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.rail}
+                renderItem={({ item }) => (
+                  <RailCard
+                    product={item}
+                    caption={`★ ${item.sellerRating.toFixed(1)} · ${
+                      item.location
+                    }`}
+                    onPress={() =>
+                      navigation.navigate('Product', { productId: item.id })
+                    }
                   />
-                </View>
-                <FlatList
-                  horizontal
-                  data={nearbyListings}
-                  keyExtractor={({ product }) => product.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.rail}
-                  renderItem={({ item: { product, km } }) => (
-                    <RailCard
-                      product={product}
-                      caption={`${formatKm(km)} · ${product.location}`}
-                      onPress={() => openProduct(product)}
-                    />
-                  )}
-                />
-              </>
-            )}
+                )}
+              />
+            </>
+          )}
 
-            {dealListings.length > 0 && (
-              <>
-                <View style={styles.padded}>
-                  <SectionHeader
-                    title={`🔥 Under AED ${DEAL_LIMIT}`}
-                    onSeeAll={() => navigation.navigate('Explore')}
-                  />
-                </View>
-                <FlatList
-                  horizontal
-                  data={dealListings}
-                  keyExtractor={p => p.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.rail}
-                  renderItem={({ item }) => (
-                    <RailCard
-                      product={item}
-                      onPress={() => openProduct(item)}
-                    />
-                  )}
-                />
-              </>
-            )}
-
+          {nearbyListings.length > 0 && (
             <View style={styles.padded}>
               <SectionHeader
-                title="✨ Just listed"
+                title="Nearby listings"
                 onSeeAll={() => navigation.navigate('Explore')}
               />
-              <View style={styles.grid}>
-                {listings.slice(0, 6).map(product => (
-                  <ListingTile
+              <View style={styles.cardGrid}>
+                {nearbyListings.map(({ product, km }) => (
+                  <RailCard
                     key={product.id}
                     product={product}
-                    width={tileWidth}
-                    onPress={() => openProduct(product)}
+                    width={gridCardWidth}
+                    caption={`${formatKm(km)} · ${product.location}`}
+                    onPress={() =>
+                      navigation.navigate('Product', { productId: product.id })
+                    }
                   />
                 ))}
               </View>
             </View>
-          </>
-        )}
-      </ScrollView>
+          )}
 
-      <LocationSheet
-        visible={locationOpen}
-        selected={area}
-        onSelect={setArea}
-        onClose={() => setLocationOpen(false)}
-      />
+          {dealListings.length > 0 && (
+            <View style={styles.padded}>
+              <SectionHeader
+                title={`Under AED ${DEAL_LIMIT}`}
+                onSeeAll={() => navigation.navigate('Explore')}
+              />
+              <View style={styles.cardGrid}>
+                {dealListings.map(product => (
+                  <RailCard
+                    key={product.id}
+                    product={product}
+                    width={gridCardWidth}
+                    caption={`${product.condition} · ${product.location}`}
+                    onPress={() =>
+                      navigation.navigate('Product', { productId: product.id })
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {searching && (
+        <FlatList
+          data={results}
+          keyExtractor={p => p.id}
+          numColumns={2}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              width={cardWidth}
+              onPress={() =>
+                navigation.navigate('Product', { productId: item.id })
+              }
+            />
+          )}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.results}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            results.length > 0 ? (
+              <Text style={styles.resultCount}>
+                {results.length} {results.length === 1 ? 'result' : 'results'}
+              </Text>
+            ) : undefined
+          }
+          ListEmptyComponent={
+            !listings ? (
+              error ? (
+                <ErrorState error={error} onRetry={() => refetch()} />
+              ) : (
+                <LoadingState />
+              )
+            ) : (
+              <EmptyState
+                icon="explore"
+                title="No items found"
+                text={`Nothing matches "${query.trim()}".`}
+              />
+            )
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -644,146 +467,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
-    paddingTop: 12,
-    paddingBottom: 32,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: PADDING,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  searchRow: {
+    paddingHorizontal: PADDING,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  browse: {
+    paddingBottom: 24,
   },
   padded: {
     paddingHorizontal: PADDING,
   },
-  pressed: {
-    opacity: 0.8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: PADDING,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  hello: {
-    flex: 1,
-  },
-  helloName: {
-    fontFamily: fonts.display,
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  location: {
-    maxWidth: 150,
-    height: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  locationText: {
-    flexShrink: 1,
-    fontFamily: fonts.label,
-    fontSize: 12,
-    color: colors.textPrimary,
-  },
-  helloSub: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  search: {
-    height: 54,
-    marginTop: 18,
-    marginHorizontal: PADDING,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    borderRadius: 27,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    boxShadow: `0 6px 16px ${withAlpha(palette.ink, 0.08)}`,
-  },
-  searchText: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  promos: {
-    gap: GAP,
-    paddingHorizontal: PADDING,
-    paddingTop: 20,
-  },
-  promo: {
-    height: 170,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 20,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  promoText: {
-    flex: 1,
-    gap: 6,
-  },
-  promoEyebrow: {
-    fontFamily: fonts.label,
-    fontSize: 11,
-    letterSpacing: 1.5,
-  },
-  promoTitle: {
-    fontFamily: fonts.display,
-    fontSize: 20,
-    lineHeight: 25,
-  },
-  promoCta: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-  },
-  promoCtaText: {
-    fontFamily: fonts.label,
-    fontSize: 12,
-  },
-  promoIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.border,
-  },
-  dotOn: {
-    width: 20,
-    backgroundColor: colors.accent,
-  },
   sectionHeader: {
-    marginTop: 28,
+    marginTop: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -805,18 +509,21 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   categories: {
-    gap: 16,
-    paddingHorizontal: PADDING,
-    paddingTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 18,
+    marginTop: 16,
   },
+  // A quarter of the row each, so a short last row stays in the columns.
   category: {
+    width: '25%',
     alignItems: 'center',
     gap: 8,
   },
   categoryCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -825,8 +532,8 @@ const styles = StyleSheet.create({
     borderColor: colors.accentSoft,
   },
   categoryImage: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
   },
   categoryInitial: {
     fontFamily: fonts.display,
@@ -835,27 +542,20 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontFamily: fonts.label,
-    fontSize: 12,
+    fontSize: 13,
     color: colors.textPrimary,
   },
   rail: {
     gap: GAP,
     paddingHorizontal: PADDING,
-    paddingTop: 14,
+    paddingTop: 16,
   },
-  deal: {
-    width: 140,
-  },
-  photo: {
-    overflow: 'hidden',
-    borderRadius: 18,
-    backgroundColor: palette.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  photoFlush: {
-    borderWidth: 0,
-    borderRadius: 0,
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: GAP,
+    rowGap: 16,
+    marginTop: 16,
   },
   priceTag: {
     position: 'absolute',
@@ -871,80 +571,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.onPrimary,
   },
-  dealTitle: {
+  railTitle: {
     marginTop: 8,
     fontFamily: fonts.label,
     fontSize: 13,
     lineHeight: 17,
     color: colors.textPrimary,
   },
-  dealCaption: {
+  railCaption: {
     marginTop: 2,
     fontFamily: fonts.body,
     fontSize: 11,
     color: colors.textSecondary,
   },
-  grid: {
-    marginTop: 14,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  results: {
+    flexGrow: 1,
+    paddingHorizontal: PADDING,
+    paddingBottom: 24,
     gap: GAP,
   },
-  tile: {
-    borderRadius: 18,
-    overflow: 'hidden',
+  row: {
+    gap: GAP,
+  },
+  resultCount: {
+    fontFamily: fonts.label,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  newBadge: {
-    position: 'absolute',
-    left: 8,
-    top: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: withAlpha(palette.ink, 0.75),
-  },
-  newBadgeText: {
-    fontFamily: fonts.label,
-    fontSize: 10,
-    color: colors.onPrimary,
-  },
-  tileBody: {
-    padding: 10,
-    gap: 2,
-  },
-  tilePrice: {
-    fontFamily: fonts.display,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  tileTitle: {
-    fontFamily: fonts.label,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  tileMeta: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  star: {
-    color: colors.accent,
-  },
-  heart: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  // Same height and rounding as the menu button, like the other tabs' title
+  // pills. It shrinks to fit so long area names are cut off, not wrapped.
+  location: {
+    flexShrink: 1,
+    height: 44,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: withAlpha(palette.white, 0.92),
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  locationText: {
+    flexShrink: 1,
+    fontFamily: fonts.label,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });
 

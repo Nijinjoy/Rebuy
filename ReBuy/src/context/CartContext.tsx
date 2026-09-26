@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useSessionState } from './useSessionState';
 import type { Product } from '../types/listing';
 
 export type CartItem = {
@@ -21,7 +22,7 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useSessionState<CartItem[]>([]);
 
   const value = useMemo<CartContextValue>(() => {
     const removeItem = (productId: string) =>
@@ -56,7 +57,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       clear: () => setItems([]),
     };
-  }, [items]);
+  }, [items, setItems]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

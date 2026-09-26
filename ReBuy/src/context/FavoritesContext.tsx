@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useSessionState } from './useSessionState';
 
 type FavoritesContextValue = {
   ids: string[];
@@ -10,7 +11,7 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 // Saved listings, kept in memory until there's an API for them.
 export function FavoritesProvider({ children }: { children: ReactNode }) {
-  const [ids, setIds] = useState<string[]>([]);
+  const [ids, setIds] = useSessionState<string[]>([]);
 
   const value = useMemo<FavoritesContextValue>(
     () => ({
@@ -23,7 +24,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
             : [...current, productId],
         ),
     }),
-    [ids],
+    [ids, setIds],
   );
 
   return (

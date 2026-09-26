@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import CategoryScreen from '../screens/category/CategoryScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
@@ -33,6 +34,7 @@ function RootNavigator() {
             <Stack.Screen name="App" component={AppDrawer} />
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="Product" component={ProductScreen} />
+            <Stack.Screen name="Category" component={CategoryScreen} />
             <Stack.Screen name="Orders" component={OrdersScreen} />
             <Stack.Screen name="Favourites" component={FavouritesScreen} />
             <Stack.Screen name="Addresses" component={AddressesScreen} />

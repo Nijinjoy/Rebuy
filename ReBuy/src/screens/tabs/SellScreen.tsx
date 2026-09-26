@@ -160,7 +160,7 @@ function ListingForm({ sellerType }: { sellerType: SellerType }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <ScreenHeader title="Sell" />
+          <ScreenHeader title="Sell" pill />
           <Text style={styles.description}>
             List a pre-owned item for sale.
           </Text>

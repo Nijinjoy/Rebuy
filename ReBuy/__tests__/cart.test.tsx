@@ -1,4 +1,5 @@
 import ReactTestRenderer from 'react-test-renderer';
+import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider, useCart } from '../src/context/CartContext';
 import { SAMPLE_PRODUCTS } from '../src/data/sampleProducts';
 
@@ -12,9 +13,11 @@ function renderCart() {
   }
   ReactTestRenderer.act(() => {
     ReactTestRenderer.create(
-      <CartProvider>
-        <Probe />
-      </CartProvider>,
+      <AuthProvider>
+        <CartProvider>
+          <Probe />
+        </CartProvider>
+      </AuthProvider>,
     );
   });
   return () => ref.current!;

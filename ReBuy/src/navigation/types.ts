@@ -20,6 +20,8 @@ export type RootStackParamList = {
   App: NavigatorScreenParams<DrawerParamList> | undefined;
   Chat: { chatId: string };
   Product: { productId: string };
+  // All listings in one category.
+  Category: { category: Category };
   Orders: undefined;
   Favourites: undefined;
   Addresses: undefined;

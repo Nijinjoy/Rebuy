@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useSessionState } from './useSessionState';
 
 export type SellerType = 'individual' | 'company';
 
@@ -13,11 +14,11 @@ const SellerContext = createContext<SellerContextValue | null>(null);
 
 // Kept in memory until seller profiles exist in the API.
 export function SellerProvider({ children }: { children: ReactNode }) {
-  const [sellerType, setSellerType] = useState<SellerType | null>(null);
+  const [sellerType, setSellerType] = useSessionState<SellerType | null>(null);
 
   const value = useMemo<SellerContextValue>(
     () => ({ sellerType, setSellerType }),
-    [sellerType],
+    [sellerType, setSellerType],
   );
 
   return (

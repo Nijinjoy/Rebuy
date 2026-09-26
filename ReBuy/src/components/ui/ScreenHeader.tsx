@@ -7,10 +7,12 @@ type Props = {
   title: string;
   // Shows a back button instead of the menu button.
   onBack?: () => void;
+  // Shows the title in a pill that matches the menu button, as the tabs do.
+  pill?: boolean;
 };
 
 // Screen title with a menu button that opens the profile drawer.
-function ScreenHeader({ title, onBack }: Props) {
+function ScreenHeader({ title, onBack, pill }: Props) {
   const navigation = useNavigation();
 
   return (
@@ -31,7 +33,19 @@ function ScreenHeader({ title, onBack }: Props) {
         />
       </Pressable>
       <View style={styles.titles}>
-        <Text style={styles.title}>{title}</Text>
+        {pill ? (
+          <View style={styles.pill}>
+            <Text
+              style={styles.pillText}
+              numberOfLines={1}
+              accessibilityRole="header"
+            >
+              {title}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.title}>{title}</Text>
+        )}
       </View>
     </View>
   );
@@ -62,6 +76,23 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.display,
     fontSize: 26,
+    color: colors.textPrimary,
+  },
+  // Same height, rounding and border as the menu button.
+  pill: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pillText: {
+    fontFamily: fonts.display,
+    fontSize: 16,
     color: colors.textPrimary,
   },
 });

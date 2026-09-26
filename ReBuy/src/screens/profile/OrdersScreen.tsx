@@ -18,7 +18,7 @@ function OrdersScreen({ navigation }: RootStackScreenProps<'Orders'>) {
         onAction={() =>
           navigation.navigate('App', {
             screen: 'Tabs',
-            params: { screen: 'Home' },
+            params: { screen: 'Explore' },
           })
         }
       />
