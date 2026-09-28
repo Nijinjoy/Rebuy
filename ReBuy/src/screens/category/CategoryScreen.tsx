@@ -8,6 +8,7 @@ import LoadingState from '../../components/ui/LoadingState';
 import ScreenHeader from '../../components/ui/ScreenHeader';
 import SearchField from '../../components/ui/SearchField';
 import { useListings } from '../../hooks/useListings';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import type { RootStackScreenProps } from '../../navigation/types';
 import { colors } from '../../theme';
 import { NO_FILTERS, searchListings } from '../../utils/listingSearch';
@@ -24,7 +25,8 @@ function CategoryScreen({
   const { category } = route.params;
   const { width } = useWindowDimensions();
   const cardWidth = (width - PADDING * 2 - GAP) / 2;
-  const { data: listings, error, refetch, isRefetching } = useListings();
+  const { data: listings, error, refetch } = useListings();
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const [query, setQuery] = useState('');
   const searching = query.trim().length > 0;
   const products = useMemo(
@@ -72,8 +74,8 @@ function CategoryScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        refreshing={isRefetching}
-        onRefresh={() => refetch()}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         ListEmptyComponent={
           !listings ? (
             error ? (
@@ -83,7 +85,7 @@ function CategoryScreen({
             )
           ) : (
             <EmptyState
-              icon="explore"
+              icon="search"
               title={searching ? 'No items found' : 'Nothing here yet'}
               text={
                 searching

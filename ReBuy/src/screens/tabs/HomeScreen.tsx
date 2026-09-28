@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import TabScreen from '../../components/ui/TabScreen';
 import PromoCarousel from '../../components/home/PromoCarousel';
 import ProductCard from '../../components/product/ProductCard';
 import ProductThumb from '../../components/product/ProductThumb';
@@ -247,7 +247,7 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
 
   // The tab bar already covers the bottom safe area.
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.screen}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -450,7 +450,7 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
               )
             ) : (
               <EmptyState
-                icon="explore"
+                icon="search"
                 title="No items found"
                 text={`Nothing matches "${query.trim()}".`}
               />
@@ -458,7 +458,7 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
           }
         />
       )}
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 

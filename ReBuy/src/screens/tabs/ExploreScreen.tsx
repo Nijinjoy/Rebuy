@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import TabScreen from '../../components/ui/TabScreen';
 import BrowseSections from '../../components/explore/BrowseSections';
 import Chip from '../../components/explore/Chip';
 import FilterSheet from '../../components/explore/FilterSheet';
@@ -32,6 +32,7 @@ import {
 } from '../../utils/listingSearch';
 import { CATEGORIES, Category, Product } from '../../types/listing';
 import { useListings } from '../../hooks/useListings';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import type { TabScreenProps } from '../../navigation/types';
 import { colors, fonts } from '../../theme';
 
@@ -115,7 +116,8 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
 
   const cardWidth = (width - PADDING * 2 - GAP) / 2;
 
-  const { data: listings, error, refetch, isRefetching } = useListings();
+  const { data: listings, error, refetch } = useListings();
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const tiles = useMemo(() => categoryTiles(listings ?? []), [listings]);
   const [allCategories, setAllCategories] = useState(false);
   const shownTiles = allCategories ? tiles : tiles.slice(0, CATEGORY_PREVIEW);
@@ -165,7 +167,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
 
   // The tab bar already covers the bottom safe area.
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.screen}>
       <View style={styles.header}>
         <ScreenHeader
           title={category ?? 'Explore'}
@@ -174,7 +176,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         />
         <View style={styles.searchRow}>
           <View style={styles.search}>
-            <Icon name="explore" color={colors.placeholder} size={18} />
+            <Icon name="search" color={colors.placeholder} size={18} />
             <TextInput
               style={styles.searchInput}
               placeholder={
@@ -304,8 +306,8 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
             toolbar
           )
         }
-        refreshing={isRefetching}
-        onRefresh={() => refetch()}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         ListEmptyComponent={
           !listings ? (
             error ? (
@@ -315,7 +317,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
             )
           ) : browsing ? undefined : (
             <View style={styles.empty}>
-              <Icon name="explore" color={colors.placeholder} size={48} />
+              <Icon name="search" color={colors.placeholder} size={48} />
               <Text style={styles.emptyTitle}>No items found</Text>
               <Text style={styles.emptyText}>
                 {filterCount > 0
@@ -340,7 +342,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         onSelect={setSort}
         onClose={() => setSortOpen(false)}
       />
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 

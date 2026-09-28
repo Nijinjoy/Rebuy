@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import TabScreen from '../../components/ui/TabScreen';
 import Avatar from '../../components/ui/Avatar';
 import Icon from '../../components/ui/Icon';
 import ProductThumb from '../../components/product/ProductThumb';
@@ -112,11 +112,11 @@ function ChatsScreen({ navigation }: TabScreenProps<'Chats'>) {
 
   // The tab bar already covers the bottom safe area.
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.screen}>
       <View style={styles.header}>
         <ScreenHeader title="Chats" pill />
         <View style={styles.search}>
-          <Icon name="explore" color={colors.placeholder} size={18} />
+          <Icon name="search" color={colors.placeholder} size={18} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name or item"
@@ -183,7 +183,7 @@ function ChatsScreen({ navigation }: TabScreenProps<'Chats'>) {
           </View>
         }
       />
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 

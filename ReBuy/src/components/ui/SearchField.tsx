@@ -12,7 +12,7 @@ type Props = {
 function SearchField({ value, onChangeText, placeholder }: Props) {
   return (
     <View style={styles.search}>
-      <Icon name="explore" color={colors.textSecondary} size={20} />
+      <Icon name="search" color={colors.textSecondary} size={20} />
       <TextInput
         style={styles.input}
         placeholder={placeholder}

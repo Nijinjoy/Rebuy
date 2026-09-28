@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts } from '../../theme';
 import ScreenHeader from './ScreenHeader';
+import TabScreen from './TabScreen';
 
 type Props = {
   title: string;
@@ -14,7 +14,7 @@ type Props = {
 // Temporary layout for screens that aren't built yet.
 function ScreenPlaceholder({ title, description, children, onBack }: Props) {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -23,7 +23,7 @@ function ScreenPlaceholder({ title, description, children, onBack }: Props) {
         <Text style={styles.description}>{description}</Text>
         {children}
       </ScrollView>
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 

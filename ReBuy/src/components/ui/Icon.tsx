@@ -3,6 +3,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 export type IconName =
   | 'home'
   | 'explore'
+  | 'search'
   | 'sell'
   | 'chats'
   | 'profile'
@@ -62,6 +63,12 @@ function Icon({ name, color, size = 24, fill = 'none' }: Props) {
         </>
       )}
       {name === 'explore' && (
+        <>
+          <Circle cx={12} cy={12} r={10} />
+          <Path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+        </>
+      )}
+      {name === 'search' && (
         <>
           <Circle cx={11} cy={11} r={8} />
           <Path d="m21 21-4.3-4.3" />

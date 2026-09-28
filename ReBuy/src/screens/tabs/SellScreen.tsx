@@ -10,7 +10,7 @@ import {
   TextInputInstance,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import TabScreen from '../../components/ui/TabScreen';
 import SellerTypePicker, {
   SELLER_TYPES,
 } from '../../components/sell/SellerTypePicker';
@@ -150,7 +150,7 @@ function ListingForm({ sellerType }: { sellerType: SellerType }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -293,7 +293,7 @@ function ListingForm({ sellerType }: { sellerType: SellerType }) {
           />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 

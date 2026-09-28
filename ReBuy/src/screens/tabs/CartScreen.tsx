@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import TabScreen from '../../components/ui/TabScreen';
 import { CartItem, useCart } from '../../context/CartContext';
 import Button from '../../components/ui/Button';
 import Icon, { IconName } from '../../components/ui/Icon';
@@ -100,7 +100,7 @@ function CartScreen({ navigation }: Props) {
 
   // The tab bar already covers the bottom safe area.
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <TabScreen style={styles.screen}>
       <View style={styles.header}>
         <ScreenHeader title="Cart" pill />
       </View>
@@ -146,7 +146,7 @@ function CartScreen({ navigation }: Props) {
           </View>
         </>
       )}
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 
