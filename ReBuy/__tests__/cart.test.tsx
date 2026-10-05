@@ -1,7 +1,7 @@
 import ReactTestRenderer from 'react-test-renderer';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider, useCart } from '../src/context/CartContext';
-import { SAMPLE_PRODUCTS } from '../src/data/sampleProducts';
+import { SAMPLE_PRODUCTS } from '../__fixtures__/sampleProducts';
 
 const [phone, headphones] = SAMPLE_PRODUCTS;
 

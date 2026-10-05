@@ -14,7 +14,7 @@ Geolocation.setRNConfiguration({
 // Shown to the user, so keep these plain.
 export class LocationError extends Error {}
 
-function getPosition() {
+export function getPosition() {
   return new Promise<{ lat: number; lng: number }>((resolve, reject) => {
     Geolocation.getCurrentPosition(
       ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
@@ -48,7 +48,7 @@ const NAME_TYPES = [
 ];
 
 // Area name for a point, via Google's Geocoding API.
-async function areaName(lat: number, lng: number) {
+export async function areaName(lat: number, lng: number) {
   const url =
     'https://maps.googleapis.com/maps/api/geocode/json' +
     `?latlng=${lat},${lng}&result_type=${NAME_TYPES.join('|')}` +
@@ -68,6 +68,47 @@ async function areaName(lat: number, lng: number) {
     }
   }
   return null;
+}
+
+// Longest location the backend accepts.
+const MAX_ADDRESS_LENGTH = 100;
+
+// Street-level address for a point, e.g. "Braih St, Dubai Marina, Dubai".
+// `label` replaces the street, for a place the user searched for by name.
+// Null when nothing could be looked up.
+export async function placeAddress(lat: number, lng: number, label?: string) {
+  const url =
+    'https://maps.googleapis.com/maps/api/geocode/json' +
+    `?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+
+  const response = await fetch(url);
+  const data: GeocodeResponse = await response.json();
+  if (data.status !== 'OK') {
+    return label ?? null;
+  }
+
+  const components = data.results.flatMap(r => r.address_components);
+  const find = (types: string[], skip?: RegExp) => {
+    for (const type of types) {
+      const match = components.find(
+        c => c.types.includes(type) && !skip?.test(c.long_name),
+      );
+      if (match) {
+        return match.long_name;
+      }
+    }
+    return undefined;
+  };
+
+  const parts = [
+    label ?? find(['route'], /unnamed/i),
+    find(['neighborhood', 'sublocality_level_1', 'sublocality', 'locality']),
+    find(['administrative_area_level_1']),
+  ].filter((part): part is string => !!part);
+  // e.g. the area and emirate are both "Sharjah".
+  const address = [...new Set(parts)].join(', ');
+
+  return address.slice(0, MAX_ADDRESS_LENGTH) || null;
 }
 
 // The user's current position as an Area. Throws LocationError.

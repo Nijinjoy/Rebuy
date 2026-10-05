@@ -4,7 +4,7 @@ import {
   Search,
   searchListings,
 } from '../src/utils/listingSearch';
-import { SAMPLE_PRODUCTS } from '../src/data/sampleProducts';
+import { SAMPLE_PRODUCTS } from '../__fixtures__/sampleProducts';
 
 const all: Search = {
   query: '',

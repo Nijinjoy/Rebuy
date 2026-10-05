@@ -1,3 +1,4 @@
+import { locationIsIn } from '../data/areas';
 import type { Category, Condition, Product } from '../types/listing';
 
 export const SORTS = {
@@ -57,7 +58,7 @@ function matches(product: Product, { query, category, filters }: Search) {
     (minPrice === null || product.price >= minPrice) &&
     (maxPrice === null || product.price <= maxPrice) &&
     (conditions.length === 0 || conditions.includes(product.condition)) &&
-    (locations.length === 0 || locations.includes(product.location)) &&
+    (locations.length === 0 || locationIsIn(product.location, locations)) &&
     (minRating === null || product.sellerRating >= minRating)
   );
 }

@@ -4,7 +4,9 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from './src/api/queryClient';
+import { AlertProvider } from './src/components/ui/AlertProvider';
 import ErrorBoundary from './src/components/ui/ErrorBoundary';
+import LocationPermissionGate from './src/components/location/LocationPermissionGate';
 import AppProviders from './src/context/AppProviders';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -17,20 +19,24 @@ function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <ErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              {/* The app renders underneath the splash from the start, so
+        <AlertProvider>
+          <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                {/* The app renders underneath the splash from the start, so
                   the splash fades out onto a ready screen, not a blank one. */}
-              <AppProviders>
-                <RootNavigator />
-              </AppProviders>
-              {showSplash && (
-                <SplashScreen onFinish={() => setShowSplash(false)} />
-              )}
-            </AuthProvider>
-          </QueryClientProvider>
-        </ErrorBoundary>
+                <AppProviders>
+                  <RootNavigator />
+                  {/* Waits for the splash so the modal isn't hidden under it. */}
+                  <LocationPermissionGate enabled={!showSplash} />
+                </AppProviders>
+                {showSplash && (
+                  <SplashScreen onFinish={() => setShowSplash(false)} />
+                )}
+              </AuthProvider>
+            </QueryClientProvider>
+          </ErrorBoundary>
+        </AlertProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

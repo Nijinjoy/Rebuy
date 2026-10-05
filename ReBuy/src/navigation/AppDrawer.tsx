@@ -4,16 +4,24 @@ import {
   DrawerContentScrollView,
 } from '@react-navigation/drawer';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { backendAssetUrl } from '../config/env';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import LocationSheet from '../components/home/LocationSheet';
 import Avatar from '../components/ui/Avatar';
 import Icon, { IconName } from '../components/ui/Icon';
+import { useAvatarActions } from '../hooks/useAvatarActions';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import { colors, fonts } from '../theme';
 import MainTabs from './MainTabs';
@@ -76,8 +84,40 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
+function HeaderButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+    >
+      <Text style={styles.headerButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// "Sep 2026" from the account's created_at timestamp.
+function formatMemberSince(createdAt?: string) {
+  if (!createdAt) {
+    return null;
+  }
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const { user, signOut } = useAuth();
+  const memberSince = formatMemberSince(user?.created_at);
+  const { hasPhoto, busy, changePhoto } = useAvatarActions();
   const { area, setArea } = useLocation();
   const [locationOpen, setLocationOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -93,28 +133,65 @@ function DrawerContent({ navigation }: DrawerContentComponentProps) {
   return (
     <View style={styles.container}>
       <DrawerContentScrollView contentContainerStyle={styles.scroll}>
-        {user && (
-          <View style={[styles.profile, { paddingTop: insets.top + 24 }]}>
-            <Avatar name={user.name} size={72} />
-            <Text style={styles.name} numberOfLines={1}>
-              {user.name}
-            </Text>
-            <Text style={styles.rating}>
-              <Text style={styles.star}>★ </Text>
-              {user.rating ? user.rating.toFixed(1) : 'No ratings yet'}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Profile')}
-              style={({ pressed }) => [
-                styles.editButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.editText}>Edit Profile</Text>
-            </Pressable>
-          </View>
-        )}
+        <View style={[styles.profile, { paddingTop: insets.top + 24 }]}>
+          {user ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={hasPhoto ? 'Change photo' : 'Add photo'}
+                disabled={busy}
+                onPress={changePhoto}
+                style={({ pressed }) => pressed && styles.pressed}
+              >
+                <Avatar
+                  name={user.name}
+                  size={72}
+                  uri={backendAssetUrl(user.avatar_url)}
+                />
+                {busy && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color={colors.surface} />
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Icon name="camera" color={colors.textPrimary} size={12} />
+                </View>
+              </Pressable>
+              <Text style={styles.name} numberOfLines={1}>
+                {user.name}
+              </Text>
+              {!!user.email && (
+                <Text style={styles.detail} numberOfLines={1}>
+                  {user.email}
+                </Text>
+              )}
+              {!!memberSince && (
+                <Text style={styles.detail}>Member since {memberSince}</Text>
+              )}
+              {!!user.rating && (
+                <Text style={styles.detail}>
+                  <Text style={styles.star}>★ </Text>
+                  {user.rating.toFixed(1)}
+                </Text>
+              )}
+              <HeaderButton
+                label="View Profile"
+                onPress={() => {
+                  navigation.closeDrawer();
+                  navigation.navigate('Profile');
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Avatar name="Guest" size={72} />
+              <Text style={styles.name}>Hello, Guest</Text>
+              <Text style={styles.detail}>Sign in to buy, sell and chat.</Text>
+              {/* Leaving guest mode swaps the stack back to Login. */}
+              <HeaderButton label="Sign in" onPress={signOut} />
+            </>
+          )}
+        </View>
 
         <SectionTitle title="My Activity" />
         {ACTIVITY.map(item => (
@@ -204,13 +281,33 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.backgroundAlt,
   },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.backgroundAlt,
+    backgroundColor: colors.accent,
+  },
   name: {
     marginTop: 10,
     fontFamily: fonts.display,
     fontSize: 18,
     color: colors.textPrimary,
   },
-  rating: {
+  detail: {
     fontFamily: fonts.bodyMedium,
     fontSize: 13,
     color: colors.textSecondary,
@@ -218,7 +315,7 @@ const styles = StyleSheet.create({
   star: {
     color: colors.accent,
   },
-  editButton: {
+  headerButton: {
     marginTop: 12,
     paddingHorizontal: 20,
     paddingVertical: 8,
@@ -229,7 +326,7 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-  editText: {
+  headerButtonText: {
     fontFamily: fonts.label,
     fontSize: 13,
     color: colors.textPrimary,

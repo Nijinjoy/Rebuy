@@ -1,11 +1,5 @@
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import TabScreen from '../../components/ui/TabScreen';
 import { CartItem, useCart } from '../../context/CartContext';
 import Button from '../../components/ui/Button';
@@ -88,11 +82,11 @@ function CartScreen({ navigation }: Props) {
 
   const handleCheckout = () => {
     // Placeholder until checkout and payments are built.
-    Alert.alert('Checkout', 'Checkout is coming soon.');
+    showAlert('Checkout', 'Checkout is coming soon.');
   };
 
   const handleClear = () => {
-    Alert.alert('Clear cart?', 'This removes all items from your cart.', [
+    showAlert('Clear cart?', 'This removes all items from your cart.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear', style: 'destructive', onPress: clear },
     ]);

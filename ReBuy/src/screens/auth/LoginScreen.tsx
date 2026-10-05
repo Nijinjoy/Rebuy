@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -9,42 +8,81 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInputInstance,
   View,
 } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
+import axios from 'axios';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { logo } from '../../assets/images';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/ui/Button';
+import FormTextField from '../../components/form/FormTextField';
 import { useAuth } from '../../context/AuthContext';
+import { login } from '../../services/api/auth/authService';
 import type { RootStackScreenProps } from '../../navigation/types';
-import TextField from '../../components/ui/TextField';
 import { colors, fonts } from '../../theme';
+import { loginSchema } from '../../utils/authSchemas';
 
 type Props = RootStackScreenProps<'Login'>;
 
-// Placeholder until social sign-in exists.
 const comingSoon = (feature: string) =>
-  Alert.alert(feature, `${feature} is coming soon.`);
+  showAlert(feature, `${feature} is coming soon.`);
 
 function LoginScreen({ navigation }: Props) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [formError, setFormError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const passwordRef = useRef<TextInputInstance>(null);
+  const { setSession, continueAsGuest } = useAuth();
+  const {
+    control,
+    handleSubmit,
+    setFocus,
+    setError,
+    clearErrors,
+    getValues,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  const handleLogin = async () => {
-    setFormError('');
-    setLoading(true);
+  useEffect(() => {
+    const { unsubscribe } = watch(() => clearErrors('root'));
+    return unsubscribe;
+  }, [watch, clearErrors]);
+
+  const handleLogin = handleSubmit(async values => {
     try {
-      await signIn(email.trim(), password);
-    } catch {
-      setFormError('Incorrect email or password. Please try again.');
-    } finally {
-      setLoading(false);
+      const response = await login(values);
+      if (!response.token || !response.user) {
+        throw new Error('Login response is missing the token or user');
+      }
+      setSession(response.user, response.token);
+    } catch (error) {
+      if (__DEV__) {
+        console.log(
+          'Login error:',
+          axios.isAxiosError(error)
+            ? error.response?.data ?? error.message
+            : error,
+        );
+      }
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message
+        : undefined;
+      // The backend names the field that was wrong, so the error shows under
+      // it; anything else (offline, server error) stays at the top of the form.
+      const field = axios.isAxiosError(error)
+        ? error.response?.data?.field
+        : undefined;
+      if (message && (field === 'email' || field === 'password')) {
+        setError(field, { message }, { shouldFocus: true });
+        return;
+      }
+      setError('root', {
+        message: message ?? "We couldn't sign you in. Please try again.",
+      });
     }
-  };
+  });
 
   return (
     <View style={styles.background}>
@@ -66,6 +104,16 @@ function LoginScreen({ navigation }: Props) {
                 accessibilityIgnoresInvertColors
               />
               <Text style={styles.wordmark}>REBUY</Text>
+              <Pressable
+                style={styles.skip}
+                accessibilityRole="button"
+                accessibilityLabel="Skip sign in"
+                hitSlop={8}
+                onPress={continueAsGuest}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.link}>Skip</Text>
+              </Pressable>
             </View>
 
             <View style={styles.header}>
@@ -76,17 +124,17 @@ function LoginScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.form}>
-              {!!formError && (
+              {!!errors.root?.message && (
                 <Text style={styles.formError} accessibilityRole="alert">
-                  {formError}
+                  {errors.root.message}
                 </Text>
               )}
 
-              <TextField
+              <FormTextField
+                control={control}
+                name="email"
                 label="Email"
                 placeholder="you@example.com"
-                value={email}
-                onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -94,23 +142,22 @@ function LoginScreen({ navigation }: Props) {
                 textContentType="emailAddress"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!loading}
+                onSubmitEditing={() => setFocus('password')}
+                editable={!isSubmitting}
               />
 
-              <TextField
-                ref={passwordRef}
+              <FormTextField
+                control={control}
+                name="password"
                 label="Password"
                 placeholder="Enter your password"
-                value={password}
-                onChangeText={setPassword}
                 password
                 autoCapitalize="none"
                 autoComplete="current-password"
                 textContentType="password"
                 returnKeyType="go"
-                onSubmitEditing={handleLogin}
-                editable={!loading}
+                onSubmitEditing={() => handleLogin()}
+                editable={!isSubmitting}
               />
 
               <Pressable
@@ -118,13 +165,19 @@ function LoginScreen({ navigation }: Props) {
                 accessibilityRole="link"
                 hitSlop={8}
                 onPress={() =>
-                  navigation.navigate('ForgotPassword', { email: email.trim() })
+                  navigation.navigate('ForgotPassword', {
+                    email: getValues('email').trim(),
+                  })
                 }
               >
                 <Text style={styles.link}>Forgot password?</Text>
               </Pressable>
 
-              <Button title="Sign in" onPress={handleLogin} loading={loading} />
+              <Button
+                title="Sign in"
+                onPress={handleLogin}
+                loading={isSubmitting}
+              />
             </View>
 
             <View style={styles.divider}>
@@ -138,14 +191,14 @@ function LoginScreen({ navigation }: Props) {
                 variant="outline"
                 title="Continue with Google"
                 onPress={() => comingSoon('Google sign-in')}
-                disabled={loading}
+                disabled={isSubmitting}
               />
               {Platform.OS === 'ios' && (
                 <Button
                   variant="outline"
                   title="Continue with Apple"
                   onPress={() => comingSoon('Apple sign-in')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                 />
               )}
             </View>
@@ -203,6 +256,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 5,
     color: colors.textPrimary,
+  },
+  skip: {
+    marginLeft: 'auto',
   },
   header: {
     marginTop: 36,

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { logo } from '../../assets/images';
+import { useAuth } from '../../context/AuthContext';
 import { colors, fonts } from '../../theme';
 
 const SPLASH_DURATION_MS = 2800;
@@ -59,6 +60,10 @@ function SplashScreen({ onFinish }: Props) {
   const textOpacity = useRef(new Animated.Value(0)).current;
   const skylineRise = useRef(new Animated.Value(40)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
+  // The saved session is checked against the server while the splash plays;
+  // it closes once both the animation and that check are done.
+  const { isRestoring } = useAuth();
+  const [animationDone, setAnimationDone] = useState(false);
 
   useEffect(() => {
     const intro = Animated.parallel([
@@ -82,11 +87,7 @@ function SplashScreen({ onFinish }: Props) {
     ]);
     intro.start();
 
-    const timer = onFinish
-      ? setTimeout(() => {
-          animate(screenOpacity, 0, { duration: 300 }).start(() => onFinish());
-        }, SPLASH_DURATION_MS)
-      : undefined;
+    const timer = setTimeout(() => setAnimationDone(true), SPLASH_DURATION_MS);
 
     return () => {
       clearTimeout(timer);
@@ -94,13 +95,21 @@ function SplashScreen({ onFinish }: Props) {
     };
   }, [
     logoOpacity,
-    onFinish,
     screenOpacity,
     skylineRise,
     starScale,
     starSpin,
     textOpacity,
   ]);
+
+  useEffect(() => {
+    if (!onFinish || !animationDone || isRestoring) {
+      return;
+    }
+    const fadeOut = animate(screenOpacity, 0, { duration: 300 });
+    fadeOut.start(() => onFinish());
+    return () => fadeOut.stop();
+  }, [animationDone, isRestoring, onFinish, screenOpacity]);
 
   const spin = starSpin.interpolate({
     inputRange: [0, 1],

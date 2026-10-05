@@ -2,7 +2,6 @@ import { DrawerActions } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -12,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import TabScreen from '../../components/ui/TabScreen';
 import PromoCarousel from '../../components/home/PromoCarousel';
 import ProductCard from '../../components/product/ProductCard';
@@ -24,11 +24,13 @@ import SearchField from '../../components/ui/SearchField';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useLocation } from '../../context/LocationContext';
 import { Area, distanceKm, findArea } from '../../data/areas';
+import { useCategories } from '../../hooks/useCategories';
 import { useListings } from '../../hooks/useListings';
 import type { TabScreenProps } from '../../navigation/types';
-import { CATEGORIES, Product } from '../../types/listing';
+import { CategoryInfo, Product } from '../../types/listing';
 import { colors, fonts, palette } from '../../theme';
-import { getCurrentArea, LocationError } from '../../utils/currentLocation';
+import { categoryIcon } from '../../utils/categoryIcons';
+import { LocationError } from '../../utils/currentLocation';
 import { formatPrice } from '../../utils/format';
 import { NO_FILTERS, searchListings } from '../../utils/listingSearch';
 
@@ -54,7 +56,11 @@ function deals(listings: Product[]) {
 function nearby(listings: Product[], area: Area) {
   return listings
     .flatMap(product => {
-      const listingArea = findArea(product.location);
+      // API listings posted with GPS carry their own coordinates.
+      const listingArea =
+        product.lat != null && product.lng != null
+          ? { name: product.location, lat: product.lat, lng: product.lng }
+          : findArea(product.location);
       if (!listingArea) {
         return [];
       }
@@ -127,11 +133,12 @@ function RailCard({
   );
 }
 
-// Cover photo for each category: its newest listing's first image.
-function categoryTiles(listings: Product[]) {
-  return CATEGORIES.map(category => ({
-    category,
-    image: listings.find(p => p.category === category)?.images[0],
+// Categories from the API, each with the cover image set on the server.
+function categoryTiles(categories: CategoryInfo[]) {
+  return categories.map(({ name, slug, imageUrl }) => ({
+    category: name,
+    slug,
+    image: imageUrl,
   }));
 }
 
@@ -163,14 +170,13 @@ function SectionHeader({
 // Landing tab: the user's current location, a search field that lists
 // matching items as they type, and promo banners while not searching.
 function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
-  const { area, setArea } = useLocation();
-  // Whether `area` came from GPS this session, rather than the default.
-  const [located, setLocated] = useState(false);
-  const [locating, setLocating] = useState(false);
+  // LocationPermissionGate fills this in automatically once location works.
+  const { area, located, locating, locateMe } = useLocation();
 
   const { width } = useWindowDimensions();
   const cardWidth = (width - PADDING * 2 - GAP) / 2;
   const { data: listings, error, refetch } = useListings();
+  const { categories } = useCategories();
   const [query, setQuery] = useState('');
   const searching = query.trim().length > 0;
   const { ids: savedIds } = useFavorites();
@@ -188,7 +194,7 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
     (width - PADDING * 2 - GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
   );
   const dealListings = useMemo(() => deals(listings ?? []), [listings]);
-  const tiles = useMemo(() => categoryTiles(listings ?? []), [listings]);
+  const tiles = useMemo(() => categoryTiles(categories), [categories]);
   const results = useMemo(
     () =>
       searching
@@ -202,32 +208,18 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
     [listings, query, searching],
   );
 
-  // `quiet` skips the error alert, for the automatic lookup on open.
-  const locate = useCallback(
-    async (quiet = false) => {
-      setLocating(true);
-      try {
-        setArea(await getCurrentArea());
-        setLocated(true);
-      } catch (err) {
-        if (!quiet) {
-          Alert.alert(
-            'Location unavailable',
-            err instanceof LocationError
-              ? err.message
-              : 'Something went wrong. Please try again.',
-          );
-        }
-      } finally {
-        setLocating(false);
-      }
-    },
-    [setArea],
-  );
-
-  useEffect(() => {
-    locate(true);
-  }, [locate]);
+  const locate = useCallback(async () => {
+    try {
+      await locateMe();
+    } catch (err) {
+      showAlert(
+        'Location unavailable',
+        err instanceof LocationError
+          ? err.message
+          : 'Something went wrong. Please try again.',
+      );
+    }
+  }, [locateMe]);
 
   // Tabs mount on first visit, which makes that first switch stutter.
   // Home is the first tab, so it mounts the others in the background once
@@ -306,9 +298,9 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
               title="Shop by category"
               onSeeAll={() => navigation.navigate('Explore')}
             />
-            {/* Four per row; the six categories make two rows. */}
+            {/* Four per row. */}
             <View style={styles.categories}>
-              {tiles.map(({ category, image }) => (
+              {tiles.map(({ category, slug, image }) => (
                 <Pressable
                   key={category}
                   accessibilityRole="button"
@@ -324,15 +316,17 @@ function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                       <Image
                         source={{ uri: image }}
                         style={styles.categoryImage}
-                        resizeMode="contain"
+                        resizeMode="cover"
                       />
                     ) : (
-                      <Text style={styles.categoryInitial}>
-                        {category.charAt(0)}
-                      </Text>
+                      <Icon
+                        name={categoryIcon(slug)}
+                        color={colors.accent}
+                        size={30}
+                      />
                     )}
                   </View>
-                  <Text style={styles.categoryText} numberOfLines={1}>
+                  <Text style={styles.categoryText} numberOfLines={2}>
                     {category}
                   </Text>
                 </Pressable>
@@ -531,18 +525,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.accentSoft,
   },
+  // Fills the circle.
   categoryImage: {
-    width: 60,
-    height: 60,
-  },
-  categoryInitial: {
-    fontFamily: fonts.display,
-    fontSize: 24,
-    color: colors.accent,
+    width: '100%',
+    height: '100%',
   },
   categoryText: {
+    paddingHorizontal: 2,
+    textAlign: 'center',
     fontFamily: fonts.label,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 16,
     color: colors.textPrimary,
   },
   rail: {

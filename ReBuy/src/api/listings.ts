@@ -1,22 +1,19 @@
-import { useMockApi } from '../config/env';
-import { SAMPLE_PRODUCTS } from '../data/sampleProducts';
+import {
+  getListing,
+  getListings,
+} from '../services/api/listings/listingService';
 import type { Product } from '../types/listing';
-import { ApiError, request } from './client';
-import { mockResponse } from './mock';
+import { ApiError } from './client';
 
+// Listings from the ReBuy API, newest first.
 export function fetchListings(): Promise<Product[]> {
-  if (useMockApi) {
-    return mockResponse(SAMPLE_PRODUCTS);
-  }
-  return request<Product[]>('/listings');
+  return getListings();
 }
 
-export function fetchListing(id: string): Promise<Product> {
-  if (useMockApi) {
-    const product = SAMPLE_PRODUCTS.find(p => p.id === id);
-    return product
-      ? mockResponse(product)
-      : Promise.reject(new ApiError('Listing not found', 404));
+export async function fetchListing(id: string): Promise<Product> {
+  try {
+    return await getListing(id);
+  } catch {
+    throw new ApiError('Listing not found', 404);
   }
-  return request<Product>(`/listings/${encodeURIComponent(id)}`);
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import {
   Asset,
   ImageLibraryOptions,
@@ -141,7 +141,7 @@ function ChatScreen({ navigation, route }: Props) {
     }
     const image = toImage(response.assets?.[0]);
     if (response.errorCode || !image) {
-      Alert.alert(
+      showAlert(
         "Couldn't attach photo",
         response.errorCode === 'camera_unavailable'
           ? 'No camera is available on this device.'
@@ -160,7 +160,7 @@ function ChatScreen({ navigation, route }: Props) {
     launch()
       .then(handlePicked)
       .catch(() =>
-        Alert.alert(
+        showAlert(
           "Couldn't open photos",
           'The photo picker is not available in this build of the app.',
         ),
@@ -168,7 +168,7 @@ function ChatScreen({ navigation, route }: Props) {
   };
 
   const handleAttach = () => {
-    Alert.alert('Send a photo', undefined, [
+    showAlert('Send a photo', undefined, [
       {
         text: 'Take photo',
         onPress: () =>

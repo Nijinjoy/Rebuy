@@ -67,14 +67,15 @@ const login = async (req, res) => {
 
     // Find user by email
     const result = await pool.query(
-      "SELECT id, name, email, password_hash FROM users WHERE email = $1",
+      "SELECT id, name, email, avatar_url, created_at, password_hash FROM users WHERE email = $1",
       [email]
     );
 
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        field: "email",
+        message: "No account found with this email",
       });
     }
 
@@ -89,7 +90,8 @@ const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        field: "password",
+        message: "Incorrect password",
       });
     }
 
@@ -112,6 +114,8 @@ const login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        avatar_url: user.avatar_url,
+        created_at: user.created_at,
       },
     });
   } catch (error) {
@@ -124,7 +128,22 @@ const login = async (req, res) => {
   }
 };
 
+const logout = async (req, res) => { 
+  try { return res.status(200).json({ 
+    success: true, message: "Logout successful",
+   }); 
+  } catch (error) { 
+    console.error("Logout error:", error); 
+    return res.status(500).json({ 
+      success: false,
+       message: "Internal server error", 
+      }); 
+    } 
+  };
+
+
 module.exports = {
   register,
   login,
+  logout
 };

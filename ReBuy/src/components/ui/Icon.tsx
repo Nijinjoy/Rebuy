@@ -33,7 +33,15 @@ export type IconName =
   | 'filter'
   | 'sort'
   | 'mail'
-  | 'lock';
+  | 'lock'
+  | 'tv'
+  | 'sofa'
+  | 'washer'
+  | 'smartphone'
+  | 'shirt'
+  | 'baby'
+  | 'dumbbell'
+  | 'grid';
 
 type Props = {
   name: IconName;
@@ -56,6 +64,66 @@ function Icon({ name, color, size = 24, fill = 'none' }: Props) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
+      {name === 'tv' && (
+        <>
+          <Rect x={2} y={7} width={20} height={15} rx={2} />
+          <Path d="m17 2-5 5-5-5" />
+        </>
+      )}
+      {name === 'sofa' && (
+        <>
+          <Path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+          <Path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" />
+          <Path d="M4 18v2" />
+          <Path d="M20 18v2" />
+          <Path d="M12 4v9" />
+        </>
+      )}
+      {name === 'washer' && (
+        <>
+          <Rect x={3} y={2} width={18} height={20} rx={2} />
+          <Path d="M3 6h3" />
+          <Path d="M17 6h.01" />
+          <Circle cx={12} cy={13} r={5} />
+          <Path d="M12 18a2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5" />
+        </>
+      )}
+      {name === 'smartphone' && (
+        <>
+          <Rect x={5} y={2} width={14} height={20} rx={2} />
+          <Path d="M12 18h.01" />
+        </>
+      )}
+      {name === 'shirt' && (
+        <Path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
+      )}
+      {name === 'baby' && (
+        <>
+          <Path d="M9 12h.01" />
+          <Path d="M15 12h.01" />
+          <Path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" />
+          <Path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" />
+        </>
+      )}
+      {name === 'dumbbell' && (
+        <>
+          <Path d="m6.5 6.5 11 11" />
+          <Path d="m21 21-1-1" />
+          <Path d="m3 3 1 1" />
+          <Path d="m18 22 4-4" />
+          <Path d="m2 6 4-4" />
+          <Path d="m3 10 7-7" />
+          <Path d="m14 21 7-7" />
+        </>
+      )}
+      {name === 'grid' && (
+        <>
+          <Rect x={3} y={3} width={7} height={7} rx={1} />
+          <Rect x={14} y={3} width={7} height={7} rx={1} />
+          <Rect x={14} y={14} width={7} height={7} rx={1} />
+          <Rect x={3} y={14} width={7} height={7} rx={1} />
+        </>
+      )}
       {name === 'home' && (
         <>
           <Path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

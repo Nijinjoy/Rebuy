@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -9,105 +8,82 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInputInstance,
   View,
 } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
+import axios from 'axios';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { logo } from '../../assets/images';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/ui/Button';
-import { useAuth } from '../../context/AuthContext';
-import type { SignUpDetails } from '../../types/user';
+import FormTextField from '../../components/form/FormTextField';
+import { register } from '../../services/api/auth/authService';
 import type { RootStackScreenProps } from '../../navigation/types';
-import TextField from '../../components/ui/TextField';
 import { colors, fonts } from '../../theme';
+import { signUpSchema } from '../../utils/authSchemas';
 
 type Props = RootStackScreenProps<'SignUp'>;
 
-type Values = SignUpDetails & {
-  confirmPassword: string;
-  acceptedTerms: boolean;
-};
-
-type Errors = {
-  name?: string;
-  confirmPassword?: string;
-  acceptedTerms?: string;
-  form?: string;
-};
-
-function validate(values: Values): Errors {
-  const errors: Errors = {};
-  const name = values.name.trim();
-
-  if (!name) {
-    errors.name = 'Enter your full name.';
-  } else if (name.length < 2) {
-    errors.name = 'Name must be at least 2 characters.';
-  }
-
-  if (values.confirmPassword !== values.password) {
-    errors.confirmPassword = 'Passwords do not match.';
-  }
-
-  if (!values.acceptedTerms) {
-    errors.acceptedTerms = 'Accept the terms to continue.';
-  }
-
-  return errors;
-}
-
-function hasErrors(errors: Errors) {
-  return Object.values(errors).some(Boolean);
-}
-
 function SignUpScreen({ navigation }: Props) {
-  const { signUp } = useAuth();
-  const [values, setValues] = useState<Values>({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    acceptedTerms: false,
+  const {
+    control,
+    handleSubmit,
+    setFocus,
+    setError,
+    clearErrors,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      acceptedTerms: false,
+    },
   });
-  const [errors, setErrors] = useState<Errors>({});
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const emailRef = useRef<TextInputInstance>(null);
-  const passwordRef = useRef<TextInputInstance>(null);
-  const confirmRef = useRef<TextInputInstance>(null);
 
-  // After the first submit attempt, re-validate as the user types.
-  const update = <K extends keyof Values>(key: K, value: Values[K]) => {
-    const next = { ...values, [key]: value };
-    setValues(next);
-    if (submitted) {
-      setErrors(validate(next));
-    }
-  };
+  useEffect(() => {
+    const { unsubscribe } = watch(() => clearErrors('root'));
+    return unsubscribe;
+  }, [watch, clearErrors]);
 
-  const handleSignUp = async () => {
-    const found = validate(values);
-    setSubmitted(true);
-    setErrors(found);
-    if (hasErrors(found)) {
-      return;
-    }
-
-    setLoading(true);
+  const handleSignUp = handleSubmit(async ({ name, email, password }) => {
     try {
-      await signUp({
-        name: values.name.trim(),
-        email: values.email.trim(),
-        password: values.password,
+      await register({ name, email, password });
+      showAlert('Account created', 'You can now sign in.', [
+        { text: 'OK', onPress: () => navigation.popTo('Login') },
+      ]);
+    } catch (error) {
+      if (__DEV__) {
+        console.log(
+          'Register error:',
+          axios.isAxiosError(error)
+            ? error.response?.data ?? error.message
+            : error,
+        );
+      }
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message
+        : undefined;
+      // A taken email belongs under the email field; anything else (offline,
+      // server error) stays at the top of the form.
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        setError(
+          'email',
+          { message: message ?? 'Email already registered' },
+          { shouldFocus: true },
+        );
+        return;
+      }
+      setError('root', {
+        message:
+          message ?? "We couldn't create your account. Please try again.",
       });
-    } catch {
-      setErrors({
-        form: "We couldn't create your account. Please try again.",
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+  });
 
   return (
     <View style={styles.background}>
@@ -139,33 +115,31 @@ function SignUpScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.form}>
-              {!!errors.form && (
+              {!!errors.root?.message && (
                 <Text style={styles.formError} accessibilityRole="alert">
-                  {errors.form}
+                  {errors.root.message}
                 </Text>
               )}
 
-              <TextField
+              <FormTextField
+                control={control}
+                name="name"
                 label="Full name"
                 placeholder="Your name"
-                value={values.name}
-                onChangeText={v => update('name', v)}
-                error={errors.name}
                 autoCapitalize="words"
                 autoComplete="name"
                 textContentType="name"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={() => emailRef.current?.focus()}
-                editable={!loading}
+                onSubmitEditing={() => setFocus('email')}
+                editable={!isSubmitting}
               />
 
-              <TextField
-                ref={emailRef}
+              <FormTextField
+                control={control}
+                name="email"
                 label="Email"
                 placeholder="you@example.com"
-                value={values.email}
-                onChangeText={v => update('email', v)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -173,71 +147,69 @@ function SignUpScreen({ navigation }: Props) {
                 textContentType="emailAddress"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!loading}
+                onSubmitEditing={() => setFocus('password')}
+                editable={!isSubmitting}
               />
 
-              <TextField
-                ref={passwordRef}
+              <FormTextField
+                control={control}
+                name="password"
                 label="Password"
                 placeholder="Create a password"
-                value={values.password}
-                onChangeText={v => update('password', v)}
                 password
                 autoCapitalize="none"
                 autoComplete="new-password"
                 textContentType="newPassword"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={() => confirmRef.current?.focus()}
-                editable={!loading}
+                onSubmitEditing={() => setFocus('confirmPassword')}
+                editable={!isSubmitting}
               />
 
-              <TextField
-                ref={confirmRef}
+              <FormTextField
+                control={control}
+                name="confirmPassword"
                 label="Confirm password"
                 placeholder="Re-enter your password"
-                value={values.confirmPassword}
-                onChangeText={v => update('confirmPassword', v)}
-                error={errors.confirmPassword}
                 password
                 autoCapitalize="none"
                 autoComplete="new-password"
                 textContentType="newPassword"
                 returnKeyType="go"
-                onSubmitEditing={handleSignUp}
-                editable={!loading}
+                onSubmitEditing={() => handleSignUp()}
+                editable={!isSubmitting}
               />
 
               <View style={styles.termsBlock}>
                 <View style={styles.terms}>
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: values.acceptedTerms }}
-                    accessibilityLabel="I agree to the Terms and Privacy Policy"
-                    hitSlop={8}
-                    disabled={loading}
-                    onPress={() =>
-                      update('acceptedTerms', !values.acceptedTerms)
-                    }
-                    style={[
-                      styles.checkbox,
-                      values.acceptedTerms && styles.checkboxChecked,
-                      !!errors.acceptedTerms && styles.checkboxError,
-                    ]}
-                  >
-                    {values.acceptedTerms && (
-                      <Text style={styles.checkmark}>✓</Text>
+                  <Controller
+                    control={control}
+                    name="acceptedTerms"
+                    render={({ field: { value, onChange } }) => (
+                      <Pressable
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: value }}
+                        accessibilityLabel="I agree to the Terms and Privacy Policy"
+                        hitSlop={8}
+                        disabled={isSubmitting}
+                        onPress={() => onChange(!value)}
+                        style={[
+                          styles.checkbox,
+                          value && styles.checkboxChecked,
+                          !!errors.acceptedTerms && styles.checkboxError,
+                        ]}
+                      >
+                        {value && <Text style={styles.checkmark}>✓</Text>}
+                      </Pressable>
                     )}
-                  </Pressable>
+                  />
                   <Text style={styles.termsText}>
                     I agree to the{' '}
                     <Text
                       style={styles.link}
                       accessibilityRole="link"
-                      // Placeholder until the terms page exists.
                       onPress={() =>
-                        Alert.alert(
+                        showAlert(
                           'Terms and Privacy Policy',
                           'The full terms are coming soon.',
                         )
@@ -248,14 +220,16 @@ function SignUpScreen({ navigation }: Props) {
                   </Text>
                 </View>
                 {!!errors.acceptedTerms && (
-                  <Text style={styles.fieldError}>{errors.acceptedTerms}</Text>
+                  <Text style={styles.fieldError}>
+                    {errors.acceptedTerms.message}
+                  </Text>
                 )}
               </View>
 
               <Button
                 title="Create account"
                 onPress={handleSignUp}
-                loading={loading}
+                loading={isSubmitting}
               />
             </View>
 
@@ -265,7 +239,7 @@ function SignUpScreen({ navigation }: Props) {
                 accessibilityRole="link"
                 hitSlop={8}
                 onPress={() => navigation.popTo('Login')}
-                disabled={loading}
+                disabled={isSubmitting}
               >
                 <Text style={styles.link}>Sign in</Text>
               </Pressable>

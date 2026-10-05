@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import EmptyState from '../../components/ui/EmptyState';
 import ScreenPlaceholder from '../../components/ui/ScreenPlaceholder';
 import type { RootStackScreenProps } from '../../navigation/types';
@@ -6,7 +6,7 @@ import type { RootStackScreenProps } from '../../navigation/types';
 function AddressesScreen({ navigation }: RootStackScreenProps<'Addresses'>) {
   const handleAdd = () => {
     // Placeholder until saved addresses are built.
-    Alert.alert('Add address', 'Saving addresses is coming soon.');
+    showAlert('Add address', 'Saving addresses is coming soon.');
   };
 
   return (

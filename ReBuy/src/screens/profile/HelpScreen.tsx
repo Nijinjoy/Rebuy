@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import Button from '../../components/ui/Button';
 import Icon from '../../components/ui/Icon';
 import ScreenPlaceholder from '../../components/ui/ScreenPlaceholder';
@@ -10,7 +11,7 @@ const FAQS = [
   {
     question: 'How do I sell an item?',
     answer:
-      'Open the Sell tab, choose whether you sell as an individual or a company, then add photos, a title, price and location.',
+      'Open the Sell tab, then add photos, a title, price and location.',
   },
   {
     question: 'How do I contact a seller?',
@@ -34,7 +35,7 @@ function HelpScreen({ navigation }: RootStackScreenProps<'Help'>) {
 
   const handleContact = () => {
     // Placeholder until there's a support inbox.
-    Alert.alert('Contact support', 'Support chat is coming soon.');
+    showAlert('Contact support', 'Support chat is coming soon.');
   };
 
   return (

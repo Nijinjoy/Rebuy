@@ -5,8 +5,7 @@ export type Area = {
   lng: number;
 };
 
-// Areas users can pick as their location, until the app uses GPS.
-// Names match the `location` of listings in sampleProducts.
+// Areas users can pick as their location when GPS isn't used.
 export const AREAS: Area[] = [
   { name: 'Dubai Marina', lat: 25.0805, lng: 55.1403 },
   { name: 'JLT', lat: 25.0693, lng: 55.1413 },
@@ -49,6 +48,16 @@ export const EMIRATES: { name: string; areas: string[] }[] = [
 // Listing locations that belong to an emirate, for the Explore filter.
 export function emirateLocations(emirate: { name: string; areas: string[] }) {
   return [...new Set([emirate.name, ...emirate.areas])];
+}
+
+// True when a listing's location is one of `names`. Locations picked on the
+// map carry the street too ("Braih St, Dubai Marina, Dubai"), so each part
+// is compared.
+export function locationIsIn(location: string, names: string[]) {
+  const wanted = names.map(name => name.toLowerCase());
+  return location
+    .split(',')
+    .some(part => wanted.includes(part.trim().toLowerCase()));
 }
 
 export function findArea(name: string) {

@@ -1,6 +1,4 @@
 import { ApiError, request, setAuthToken } from '../src/api/client';
-import { fetchListing, fetchListings } from '../src/api/listings';
-import { SAMPLE_PRODUCTS } from '../src/data/sampleProducts';
 
 const fetchMock = jest.fn();
 globalThis.fetch = fetchMock;
@@ -43,11 +41,4 @@ test('request reports network failures with status 0', async () => {
   const error = (await request('/listings').catch(e => e)) as ApiError;
   expect(error).toBeInstanceOf(ApiError);
   expect(error.status).toBe(0);
-});
-
-test('mock listings API serves sample data', async () => {
-  await expect(fetchListings()).resolves.toEqual(SAMPLE_PRODUCTS);
-  await expect(fetchListing('p1')).resolves.toBe(SAMPLE_PRODUCTS[0]);
-  await expect(fetchListing('missing')).rejects.toMatchObject({ status: 404 });
-  expect(fetchMock).not.toHaveBeenCalled();
 });

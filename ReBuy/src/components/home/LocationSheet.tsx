@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { showAlert } from '../ui/AlertProvider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Area, AREAS } from '../../data/areas';
 import { getCurrentArea, LocationError } from '../../utils/currentLocation';
@@ -36,7 +36,7 @@ function LocationSheet({ visible, selected, onSelect, onClose }: Props) {
       onSelect(await getCurrentArea());
       onClose();
     } catch (error) {
-      Alert.alert(
+      showAlert(
         'Location unavailable',
         error instanceof LocationError
           ? error.message

@@ -22,14 +22,21 @@ import type { RootStackParamList } from './types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function RootNavigator() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isGuest, isRestoring } = useAuth();
+
+  // Wait for the saved session so a signed-in user doesn't see the login
+  // screen flash first. The splash screen covers this.
+  if (isRestoring) {
+    return null;
+  }
 
   // Switching groups on isSignedIn replaces the stack, so the user can't
   // swipe back to the login screen after signing in (or vice versa).
+  // Guests (who skipped sign-up) get the app screens too.
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isSignedIn ? (
+        {isSignedIn || isGuest ? (
           <Stack.Group>
             <Stack.Screen name="App" component={AppDrawer} />
             <Stack.Screen name="Chat" component={ChatScreen} />

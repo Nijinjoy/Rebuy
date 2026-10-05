@@ -2,17 +2,19 @@ import { useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { EMIRATE_IMAGES } from '../../assets/images/emirates';
-import { EMIRATES, emirateLocations } from '../../data/areas';
+import { EMIRATES, emirateLocations, locationIsIn } from '../../data/areas';
 import { colors, fonts } from '../../theme';
-import type { Product } from '../../types/listing';
+import type { Condition, Product } from '../../types/listing';
 import { formatPrice } from '../../utils/format';
 import { Filters, NO_FILTERS } from '../../utils/listingSearch';
+import ProductCard from '../product/ProductCard';
 import Icon from '../ui/Icon';
 import SectionTitle from './SectionTitle';
 
@@ -20,6 +22,19 @@ const GAP = 12;
 const EMIRATE_PHOTO = 48;
 // Emirates shown before "View all": two rows of two.
 const EMIRATE_PREVIEW = 4;
+
+// Newest listings shown in the "Just listed" rail.
+const JUST_LISTED = 6;
+const JUST_LISTED_CARD = 150;
+
+// Conditions shown as tiles, two rows of two, with what each one means.
+// 'Fair' is left out to keep the grid even; it's still in the filter sheet.
+const CONDITION_TILES: { condition: Condition; hint: string }[] = [
+  { condition: 'Brand new', hint: 'Unused, in original packaging' },
+  { condition: 'Like new', hint: 'Used once or twice, no marks' },
+  { condition: 'Very good', hint: 'Light use, barely visible wear' },
+  { condition: 'Good', hint: 'Regular use, some visible wear' },
+];
 
 const PRICE_RANGES: {
   label: string;
@@ -39,11 +54,13 @@ type Props = {
   // Side padding of the screen, for sizing the emirate grid.
   inset: number;
   onFilter: (filters: Filters) => void;
+  onProduct: (product: Product) => void;
 };
 
-// Explore's browse view below the categories: emirates and price ranges.
-// Each one applies a filter; sections with nothing to show are left out.
-function BrowseSections({ listings, inset, onFilter }: Props) {
+// Explore's browse view: the newest listings, then emirates, conditions and
+// price ranges. Each tile applies a filter; sections with nothing to show
+// are left out.
+function BrowseSections({ listings, inset, onFilter, onProduct }: Props) {
   const { width } = useWindowDimensions();
   const [allEmirates, setAllEmirates] = useState(false);
 
@@ -55,7 +72,8 @@ function BrowseSections({ listings, inset, onFilter }: Props) {
         return {
           name: emirate.name,
           locations,
-          count: listings.filter(p => locations.includes(p.location)).length,
+          count: listings.filter(p => locationIsIn(p.location, locations))
+            .length,
         };
       }),
     [listings],
@@ -94,8 +112,43 @@ function BrowseSections({ listings, inset, onFilter }: Props) {
     [listings],
   );
 
+  // The API returns listings newest first.
+  const justListed = listings.slice(0, JUST_LISTED);
+
+  const conditions = useMemo(
+    () =>
+      CONDITION_TILES.map(tile => ({
+        ...tile,
+        count: listings.filter(p => p.condition === tile.condition).length,
+      })),
+    [listings],
+  );
+
   return (
     <View style={styles.sections}>
+      {justListed.length > 0 && (
+        <View>
+          <SectionTitle title="Just listed" />
+          {/* Runs edge to edge, past the screen's side padding. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -inset }}
+            contentContainerStyle={[styles.rail, { paddingHorizontal: inset }]}
+          >
+            {justListed.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                width={JUST_LISTED_CARD}
+                onPress={() => onProduct(product)}
+                hideAddButton
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {shownEmirates.length > 0 && (
         <View>
           <SectionTitle
@@ -150,6 +203,32 @@ function BrowseSections({ listings, inset, onFilter }: Props) {
       )}
 
       <View>
+        <SectionTitle title="Shop by condition" />
+        <View style={styles.priceGrid}>
+          {conditions.map(({ condition, hint, count }) => (
+            <Pressable
+              key={condition}
+              accessibilityRole="button"
+              accessibilityLabel={`${condition}, ${countLabel(count)}`}
+              onPress={() =>
+                onFilter({ ...NO_FILTERS, conditions: [condition] })
+              }
+              style={({ pressed }) => [styles.price, pressed && styles.pressed]}
+            >
+              <Icon name="shield" color={colors.accent} size={18} />
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {condition}
+              </Text>
+              <Text style={styles.cardCount} numberOfLines={2}>
+                {hint}
+              </Text>
+              <Text style={styles.cardCount}>{countLabel(count)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View>
         <SectionTitle title="Shop by price" />
         <View style={styles.priceGrid}>
           {prices.map(range => (
@@ -183,6 +262,9 @@ const styles = StyleSheet.create({
   sections: {
     gap: 24,
     marginTop: 12,
+  },
+  rail: {
+    gap: GAP,
   },
   emirateGrid: {
     flexDirection: 'row',

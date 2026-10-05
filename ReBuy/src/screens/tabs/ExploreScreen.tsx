@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,6 @@ import BrowseSections from '../../components/explore/BrowseSections';
 import Chip from '../../components/explore/Chip';
 import FilterSheet from '../../components/explore/FilterSheet';
 import PopularSearches from '../../components/explore/PopularSearches';
-import SectionTitle from '../../components/explore/SectionTitle';
 import SortSheet from '../../components/explore/SortSheet';
 import ProductCard from '../../components/product/ProductCard';
 import ErrorState from '../../components/ui/ErrorState';
@@ -30,7 +28,8 @@ import {
   Sort,
   SORTS,
 } from '../../utils/listingSearch';
-import { CATEGORIES, Category, Product } from '../../types/listing';
+import { Category } from '../../types/listing';
+import { useCategories } from '../../hooks/useCategories';
 import { useListings } from '../../hooks/useListings';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import type { TabScreenProps } from '../../navigation/types';
@@ -38,63 +37,6 @@ import { colors, fonts } from '../../theme';
 
 const PADDING = 24;
 const GAP = 12;
-// Categories shown before "View all": one row.
-const CATEGORY_PREVIEW = 3;
-
-// Cover photo of the newest listing and listing count for each category,
-// busiest first (ties keep CATEGORIES' order).
-function categoryTiles(listings: Product[]) {
-  return CATEGORIES.map(category => {
-    const inCategory = listings.filter(p => p.category === category);
-    return {
-      category,
-      image: inCategory[0]?.images[0],
-      count: inCategory.length,
-    };
-  }).sort((a, b) => b.count - a.count);
-}
-
-function CategoryTile({
-  category,
-  image,
-  count,
-  onPress,
-}: {
-  category: Category;
-  image?: string;
-  count: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${category}, ${count} ${
-        count === 1 ? 'item' : 'items'
-      }`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.categoryTile, pressed && styles.pressed]}
-    >
-      <View style={styles.categoryImage}>
-        {image ? (
-          <Image
-            source={{ uri: image }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="contain"
-          />
-        ) : (
-          <Text style={styles.categoryInitial}>{category.charAt(0)}</Text>
-        )}
-      </View>
-      <Text style={styles.categoryName} numberOfLines={1}>
-        {category}
-      </Text>
-      <Text style={styles.categoryCount}>
-        {count} {count === 1 ? 'item' : 'items'}
-      </Text>
-    </Pressable>
-  );
-}
-
 function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
   const { width } = useWindowDimensions();
   const { params } = route;
@@ -117,10 +59,8 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
   const cardWidth = (width - PADDING * 2 - GAP) / 2;
 
   const { data: listings, error, refetch } = useListings();
+  const { names: categoryNames } = useCategories();
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
-  const tiles = useMemo(() => categoryTiles(listings ?? []), [listings]);
-  const [allCategories, setAllCategories] = useState(false);
-  const shownTiles = allCategories ? tiles : tiles.slice(0, CATEGORY_PREVIEW);
   const results = useMemo(
     () => searchListings(listings ?? [], { query, category, filters, sort }),
     [listings, query, category, filters, sort],
@@ -237,7 +177,7 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
               selected={!category}
               onPress={() => setCategory(null)}
             />
-            {CATEGORIES.map(c => (
+            {categoryNames.map(c => (
               <Chip
                 key={c}
                 label={c}
@@ -269,39 +209,14 @@ function ExploreScreen({ navigation, route }: TabScreenProps<'Explore'>) {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           browsing ? (
-            <View style={styles.browse}>
-              <View>
-                <SectionTitle
-                  title="Categories"
-                  action={
-                    tiles.length > CATEGORY_PREVIEW
-                      ? {
-                          label: allCategories ? 'Show less' : 'View all',
-                          onPress: () => setAllCategories(open => !open),
-                        }
-                      : undefined
-                  }
-                />
-                <View style={styles.categoryGrid}>
-                  {shownTiles.map(tile => (
-                    <CategoryTile
-                      key={tile.category}
-                      {...tile}
-                      onPress={() =>
-                        navigation.navigate('Category', {
-                          category: tile.category,
-                        })
-                      }
-                    />
-                  ))}
-                </View>
-              </View>
-              <BrowseSections
-                listings={listings ?? []}
-                inset={PADDING}
-                onFilter={setFilters}
-              />
-            </View>
+            <BrowseSections
+              listings={listings ?? []}
+              inset={PADDING}
+              onFilter={setFilters}
+              onProduct={product =>
+                navigation.navigate('Product', { productId: product.id })
+              }
+            />
           ) : (
             toolbar
           )
@@ -430,53 +345,6 @@ const styles = StyleSheet.create({
   },
   row: {
     gap: GAP,
-  },
-  browse: {
-    gap: 12,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GAP,
-  },
-  // Three per row, stretched to fill it. Sizing with flex rather than a
-  // computed width avoids rounding pushing the third tile onto a new row.
-  categoryTile: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  categoryImage: {
-    width: 56,
-    height: 56,
-    marginBottom: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderRadius: 28,
-    backgroundColor: colors.backgroundAlt,
-  },
-  categoryInitial: {
-    fontFamily: fonts.display,
-    fontSize: 22,
-    color: colors.textPrimary,
-  },
-  categoryName: {
-    fontFamily: fonts.label,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  categoryCount: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.textSecondary,
   },
   toolbar: {
     flexDirection: 'row',

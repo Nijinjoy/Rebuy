@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { showAlert } from '../../components/ui/AlertProvider';
 import Button from '../../components/ui/Button';
 import ScreenPlaceholder from '../../components/ui/ScreenPlaceholder';
 import SettingSwitch from '../../components/ui/SettingSwitch';
@@ -14,7 +15,7 @@ function PrivacyScreen({ navigation }: RootStackScreenProps<'Privacy'>) {
 
   const handleDelete = () => {
     // Placeholder until the account API exists.
-    Alert.alert('Delete account', 'Deleting your account is coming soon.');
+    showAlert('Delete account', 'Deleting your account is coming soon.');
   };
 
   return (
